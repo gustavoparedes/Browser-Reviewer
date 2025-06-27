@@ -27,7 +27,8 @@ Once processed, the data will appear in the main table, where you can filter, se
 
 - Use the **Label Manager** to create and assign custom tags to records.
 
-  ![imagen](https://github.com/user-attachments/assets/45b42f55-f4ff-4228-8364-b4f8ce321b32)
+  ![imagen](https://github.com/user-attachments/assets/fd3b890a-2476-4573-8547-fb9d6ace97d1)
+
 
 - Set the **UTC offset** at the top of the interface to adjust all timestamps to the correct time zone.
 - Quickly review user behavior by sorting records chronologically and observing the **Potential Activity** field.
