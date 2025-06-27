@@ -6,26 +6,22 @@ It requires no installation and can be executed directly from a USB drive or ove
 ![imagen](https://github.com/user-attachments/assets/3395cf20-1b7f-472b-8dee-7622d6876262)
 
 
-🚀 Getting Started
+## 🚀 Getting Started
 
-🔍 Extracting Browser Artifacts
+### 🔍 Extracting Browser Artifacts
 
 To begin analyzing browser activity:
 
-    Go to File > New
+1. Go to **File > New**
+2. Choose a **file name** for the new project (a SQLite database will be created)
+3. Click **Scan Web Activity**
 
-    Choose or create a folder where the new project will be saved
+Browser Reviewer will scan the selected path for supported browser artifacts from **Firefox** and **Chrome/Chromium-based browsers**, including:
 
-    Click Scan Web Activity
-
-Browser Reviewer will scan the selected path for supported browser artifacts from Firefox and Chrome/Chromium-based browsers, including:
-
-    🕓 Browsing history
-
-    ⬇️ Download history
-
-    🔖 Bookmarks
-
-    🧠 Autofill form data
+- 🕓 Browsing history  
+- ⬇️ Download history  
+- 🔖 Bookmarks  
+- 🧠 Autofill form data  
 
 Once processed, the data will appear in the main table, where you can filter, search, tag, and comment on individual entries.
+
