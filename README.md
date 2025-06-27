@@ -26,6 +26,9 @@ Browser Reviewer will scan the selected path for supported browser artifacts fro
 Once processed, the data will appear in the main table, where you can filter, search, tag, and comment on individual entries.
 
 - Use the **Label Manager** to create and assign custom tags to records.
+
+  ![imagen](https://github.com/user-attachments/assets/45b42f55-f4ff-4228-8364-b4f8ce321b32)
+
 - Set the **UTC offset** at the top of the interface to adjust all timestamps to the correct time zone.
 - Quickly review user behavior by sorting records chronologically and observing the **Potential Activity** field.
 - Use the search bar to perform simple keyword filtering or **advanced regular expression (RegExp)** searches across all fields.
