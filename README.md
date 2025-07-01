@@ -31,5 +31,8 @@ Once processed, the data will appear in the main table, where you can filter, se
 
 
 - Set the **UTC offset** at the top of the interface to adjust all timestamps to the correct time zone.
+
+- ![imagen](https://github.com/user-attachments/assets/ca1c4145-2d7f-4a24-b35f-04b0cd240264)
+
 - Quickly review user behavior by sorting records chronologically and observing the **Potential Activity** field.
 - Use the search bar to perform simple keyword filtering or **advanced regular expression (RegExp)** searches across all fields.
