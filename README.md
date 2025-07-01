@@ -71,6 +71,9 @@ Once processed, the data will appear in the main table, where you can filter, se
 
   
 
+- Define and apply labels and comments to annotate findings of interest during the review.
+
+![imagen](https://github.com/user-attachments/assets/f94228c2-2bf1-4e36-9d1e-e0295429858e)
 
 
 
