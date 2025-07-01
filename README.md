@@ -13,8 +13,8 @@ It requires no installation and can be executed directly from a USB drive or ove
 To begin analyzing browser activity:
 
 1. Go to **File > New**
-2. Choose a **file name** for the new project (a SQLite database will be created)
-3. Click **Scan Web Activity**
+2. Choose a **file name** for the new project.
+3. Click **"Scan Web Activity"** and select the directory where browser artifacts should be searched.
 
 Browser Reviewer will scan the selected path for supported browser artifacts from **Firefox** and **Chrome/Chromium-based browsers**, including:
 
