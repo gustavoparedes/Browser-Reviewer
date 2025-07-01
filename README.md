@@ -39,6 +39,7 @@ Once processed, the data will appear in the main table, where you can filter, se
 - ![imagen](https://github.com/user-attachments/assets/fe83af66-cc8f-4290-8b9b-540c491f33a9)
 
   and applying filters as needed.
+  
 
   ![imagen](https://github.com/user-attachments/assets/db3c666d-f886-4513-a7b7-ee7c3810532a)
 
