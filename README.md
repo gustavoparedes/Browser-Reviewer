@@ -35,4 +35,7 @@ Once processed, the data will appear in the main table, where you can filter, se
 - ![imagen](https://github.com/user-attachments/assets/ca1c4145-2d7f-4a24-b35f-04b0cd240264)
 
 - Quickly review user behavior by sorting records chronologically and observing the **Potential Activity** field.
+
+- ![imagen](https://github.com/user-attachments/assets/fe83af66-cc8f-4290-8b9b-540c491f33a9)
+
 - Use the search bar to perform simple keyword filtering or **advanced regular expression (RegExp)** searches across all fields.
