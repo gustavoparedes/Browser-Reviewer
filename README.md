@@ -38,4 +38,16 @@ Once processed, the data will appear in the main table, where you can filter, se
 
 - ![imagen](https://github.com/user-attachments/assets/fe83af66-cc8f-4290-8b9b-540c491f33a9)
 
+  and applying filters as needed.
+
+  ![imagen](https://github.com/user-attachments/assets/db3c666d-f886-4513-a7b7-ee7c3810532a)
+
+  ![imagen](https://github.com/user-attachments/assets/0dca8f1e-cafb-44ce-85e0-ae70f752f57b)
+
+
+
 - Use the search bar to perform simple keyword filtering or **advanced regular expression (RegExp)** searches across all fields.
+
+  ![imagen](https://github.com/user-attachments/assets/435882ed-ab08-4838-ab7b-82d35d2861f6)
+
+![imagen](https://github.com/user-attachments/assets/53f3262e-ddb3-4749-a170-571f27a29823)
