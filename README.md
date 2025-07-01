@@ -59,21 +59,21 @@ Once processed, the data will appear in the main table, where you can filter, se
 
   History
 
-  ![imagen](https://github.com/user-attachments/assets/5444bbc6-4ccd-452f-81bc-d386b8edcafa)
+![imagen](https://github.com/user-attachments/assets/5444bbc6-4ccd-452f-81bc-d386b8edcafa)
 
   Downloads
 
-  ![imagen](https://github.com/user-attachments/assets/14a269fd-c90c-4153-9a3a-394f9b6ea897)
+![imagen](https://github.com/user-attachments/assets/14a269fd-c90c-4153-9a3a-394f9b6ea897)
 
   Bookmarks
 
-  ![imagen](https://github.com/user-attachments/assets/753dae17-b663-4420-a3df-64dc937cfa08)
+![imagen](https://github.com/user-attachments/assets/753dae17-b663-4420-a3df-64dc937cfa08)
 
   
 
 - Define and apply labels and comments to annotate findings of interest during the review.
 
-![imagen](https://github.com/user-attachments/assets/f94228c2-2bf1-4e36-9d1e-e0295429858e)
+![imagen](https://github.com/user-attachments/assets/e19a4a7b-82fb-4b61-8397-cdfe51dd63c8)
 
 
 
