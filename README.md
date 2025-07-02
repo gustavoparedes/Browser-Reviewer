@@ -24,7 +24,7 @@ To begin analyzing browser activity:
 ![imagen](https://github.com/user-attachments/assets/9e48d0f1-fb3d-49a8-aa3f-90d75b94ee81)
 
    
-3. Click **"Scan Web Activity"** and select the directory where browser artifacts should be searched.
+3. Click **"Scan Web Activity"** and select the directory where browser artifacts should be searched. Make sure you have read access to the selected path.
 
 ![imagen](https://github.com/user-attachments/assets/4c17b8bb-eb37-40a5-97f7-5934bf92fc69)
 
