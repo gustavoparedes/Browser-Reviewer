@@ -56,10 +56,13 @@ Once processed, the data will appear in the main table, where you can filter, se
 
 
   and applying filters as needed.
-  
+
+  By category:
 
 ![imagen](https://github.com/user-attachments/assets/db3c666d-f886-4513-a7b7-ee7c3810532a)
   
+
+or by potential activity
 
 ![imagen](https://github.com/user-attachments/assets/0dca8f1e-cafb-44ce-85e0-ae70f752f57b)
 
