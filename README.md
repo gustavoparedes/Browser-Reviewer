@@ -1,5 +1,5 @@
 # Browser-Reviewer
-Browser Reviewer is a portable forensic tool for analyzing user activity in Firefox and Chrome-based browsers. It extracts and displays browsing history, downloads, bookmarks, and autofill data. The tool allows analysts to tag, comment, and export reports in PDF.
+Browser Reviewer is a portable forensic tool for analyzing user activity in Firefox and Chrome-based browsers for Windows platforms. It extracts and displays browsing history, downloads, bookmarks, and autofill data. The tool allows analysts to tag, comment, and export reports in PDF.
 
 It requires no installation and can be executed directly from a USB drive or over a network share — ideal for forensic workflows with minimal footprint on the target system.
 
