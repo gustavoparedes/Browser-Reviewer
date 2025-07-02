@@ -88,6 +88,11 @@ Once processed, the data will appear in the main table, where you can filter, se
   
 ![imagen](https://github.com/user-attachments/assets/a7db0671-292d-4a96-b1c5-e45d53c787fe)
 
+- And export results as PDF
+
+![imagen](https://github.com/user-attachments/assets/f9eafe3d-cbe2-4a74-adaa-494d6bd06ca3)
+
+
 
 
 
