@@ -49,7 +49,8 @@ Once processed, the data will appear in the main table, where you can filter, se
 
 - Quickly review user behavior by sorting records chronologically and observing the **Potential Activity** field.
 
-![imagen](https://github.com/user-attachments/assets/fe83af66-cc8f-4290-8b9b-540c491f33a9)
+![imagen](https://github.com/user-attachments/assets/3309b8db-8385-4085-9be8-3e58b2c8cee6)
+
 
   and applying filters as needed.
   
