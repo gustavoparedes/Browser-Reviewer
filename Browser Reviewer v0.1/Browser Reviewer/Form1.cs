@@ -32,7 +32,7 @@ namespace Browser_Reviewer
 
         public Form1()
         {
-            Syncfusion.Licensing.SyncfusionLicenseProvider.RegisterLicense("Ngo9BigBOggjHTQxAR8/V1NNaF5cXmBCf1FpRmJGdld5fUVHYVZUTXxaS00DNHVRdkdmWXtfdHVcR2hYWEN3WEFWYUA=");
+            Syncfusion.Licensing.SyncfusionLicenseProvider.RegisterLicense("Put your license here");
             InitializeComponent();
             InitializeNumericUpDown();
 
