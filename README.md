@@ -13,8 +13,18 @@ It requires no installation and can be executed directly from a USB drive or ove
 To begin analyzing browser activity:
 
 1. Go to **File > New**
+   
+![imagen](https://github.com/user-attachments/assets/eb79f8d9-1d95-4f0b-b28f-633a715c24ae)
+
 2. Choose a **file name** for the new project.
+
+![imagen](https://github.com/user-attachments/assets/9e48d0f1-fb3d-49a8-aa3f-90d75b94ee81)
+
+   
 3. Click **"Scan Web Activity"** and select the directory where browser artifacts should be searched.
+
+![imagen](https://github.com/user-attachments/assets/07a9bfc1-69d2-4134-9f99-2c7233fa8fc8)
+
 
 Browser Reviewer will scan the selected path for supported browser artifacts from **Firefox** and **Chrome/Chromium-based browsers**, including:
 
