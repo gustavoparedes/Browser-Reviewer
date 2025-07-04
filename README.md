@@ -21,7 +21,8 @@ To begin analyzing browser activity:
 
 2. Choose a **file name** for the new project.
 
-![imagen](https://github.com/user-attachments/assets/9e48d0f1-fb3d-49a8-aa3f-90d75b94ee81)
+![imagen](https://github.com/user-attachments/assets/fcfb1526-7f6a-468c-9989-cf1422c3ea86)
+
 
    
 3. Click **"Scan Web Activity"** and select the directory where browser artifacts should be searched. Make sure you have read access to the selected path.
