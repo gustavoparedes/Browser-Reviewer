@@ -69,10 +69,14 @@ or by potential activity, for example.
 
 
 
-- Use the search bar to perform simple keyword filtering or **advanced regular expression (RegExp)** searches across all fields.
-
+- Use the search bar to perform simple keyword filtering 
 
 ![imagen](https://github.com/user-attachments/assets/435882ed-ab08-4838-ab7b-82d35d2861f6)
+
+
+or **advanced regular expression (RegExp)** searches across all fields.
+
+
 ![imagen](https://github.com/user-attachments/assets/53f3262e-ddb3-4749-a170-571f27a29823)
 
 - Visualize and explore data from browser artifacts such as browsing history, downloads, bookmarks, and autofill entries. Browsing history is automatically categorized and tagged based on potential user activity, helping to identify relevant patterns and behaviors.
