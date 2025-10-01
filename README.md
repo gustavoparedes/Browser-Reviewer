@@ -21,7 +21,7 @@ Download compiled version [here](https://github.com/gustavoparedes/Browser-Revie
 - **Label Manager** to tag items and **Comments** to annotate findings.
 - Powerful search: simple text or **RegExp**.
 - **Time zone** offset control (consistent timestamps across cases).
-- **UI and better scaling** on different screen resolutions. ← *new in v0.2*
+- **Command-line execution (CLI mode)** for headless or automated runs. ← *new in v0.2*
 - Export options:
   - **PDF** (improved pagination & layout). ← *v0.2 improvements*
   - **HTML Report** with client-side **filter/sort**. ← *new in v0.2*
@@ -149,6 +149,29 @@ or **advanced regular expression (RegExp)** searches.
 - And export results as PDF
 
 ![imagen](https://github.com/user-attachments/assets/f9eafe3d-cbe2-4a74-adaa-494d6bd06ca3)
+
+- Command-line execution (CLI mode)
+
+C:\Users\gustavo\Desktop\Test\Browser Reviewer>
+                    Browser Reviewer v0.2 - CLI
+
+                    Usage:
+                      Browser_Reviewer.exe <BaseNameOrPath(.bre)> <RootDirectoryToScan>
+
+                    Parameters:
+                      <BaseNameOrPath(.bre)>   Name or full path of the .bre database file to create.
+                                               If no extension is provided, .bre will be added automatically.
+                      <RootDirectoryToScan>    Root folder where browser artifacts will be searched.
+
+                    Examples:
+                      Browser_Reviewer.exe MyCase "D:\Evidence\UserProfile"
+                      Browser_Reviewer.exe "C:\Cases\Case123.bre" "E:\Mounts\Image01"
+
+                    Help flags:
+                      /?   -?   -h   --help
+
+
+C:\Users\gustavo\Desktop\Test\Browser Reviewer>
 
 
 
