@@ -38,7 +38,7 @@ namespace Browser_Reviewer
 
         public Form1()
         {
-            Syncfusion.Licensing.SyncfusionLicenseProvider.RegisterLicense("Ngo9BigBOggjGyl/Vkd+XU9FcVRDX3xKf0x/TGpQb19xflBPallYVBYiSV9jS3tTf0VqWXZaeXRRQmJcUE91Xg==");
+            Syncfusion.Licensing.SyncfusionLicenseProvider.RegisterLicense("Put you license here.");
             InitializeComponent();
             InitializeNumericUpDown();
 
@@ -5556,3 +5556,4 @@ namespace Browser_Reviewer
     }
 
 }
+
