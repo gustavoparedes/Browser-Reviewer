@@ -5,6 +5,54 @@ It requires no installation and can be executed directly from a USB drive or ove
 
 Download compiled version [here](https://github.com/gustavoparedes/Browser-Reviewer/releases/download/v0.1/Browser.Reviewer.v0.1.rar).
 
+## What’s New (v0.2 — 2025-10-01)
+
+- **Better display scaling**: Improved support for different screen resolutions and high-DPI displays. UI elements, fonts and grids scale more consistently across laptops, external monitors and projectors.
+- **Time-range + Categories fix**: Resolved the *SQL logic error* that could occur when clicking on categories while a **time-range search** was active.
+- **PDF exporting, improved**: More reliable layout, better table pagination, and clearer metadata on the first page.
+- **New: Export to HTML**: Export the current view as a standalone **HTML Report** with built-in **filtering** and **sorting** (works offline in any modern browser).
+- **HTML Reports**: Interactive headers for sorting, a search box for quick filtering, and a compact summary (rows, visible columns, sort, filters, export time, and time zone).
+
+---
+
+## Features
+
+- Extracts and visualizes browser artifacts from **Firefox** and **Chrome/Chromium-based** browsers (history, downloads, bookmarks, autofill).
+- **Label Manager** to tag items and **Comments** to annotate findings.
+- Powerful search: simple text or **RegExp**.
+- **Time zone** offset control (consistent timestamps across cases).
+- **High-DPI aware** UI and better scaling on different screen resolutions. ← *new in v0.2*
+- Export options:
+  - **PDF** (improved pagination & layout). ← *v0.2 improvements*
+  - **HTML Report** with client-side **filter/sort**. ← *new in v0.2*
+
+---
+
+## Exporting
+
+### PDF
+Use **File → Export → PDF** to generate a paginated report of the current grid.  
+
+### HTML
+Use **File → Export → HTML** to generate a standalone HTML file:
+- **Sortable columns** (click column headers)
+- **Quick filter** (search box)
+- **Self-contained** (no server required; opens in any modern browser)
+- **Summary block** (rows exported, visible columns, active sort/filter, export timestamp, time zone)
+
+---
+
+## Changelog
+
+### v0.2 — 2025-10-01
+- Improved scaling for different resolutions / high-DPI displays.
+- Fixed *SQL logic error* when clicking categories with an active time-range search.
+- Better PDF export (layout, pagination, summary).
+- New **Export to HTML** and **interactive HTML Reports** (filter & sort).
+
+### v0.1 — 2025-07-02
+- Initial public release with Firefox/Chrome artifacts, labels, comments, PDF export.
+
 
 ![imagen](https://github.com/user-attachments/assets/3395cf20-1b7f-472b-8dee-7622d6876262)
 
