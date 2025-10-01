@@ -3,11 +3,11 @@ Browser Reviewer is a portable forensic tool for analyzing user activity in Fire
 
 It requires no installation and can be executed directly from a USB drive or over a network share — ideal for forensic workflows with minimal footprint on the target system.
 
-Download compiled version [here](https://github.com/gustavoparedes/Browser-Reviewer/releases/download/v0.1/Browser.Reviewer.v0.1.rar).
+Download compiled version [here](https://github.com/gustavoparedes/Browser-Reviewer/releases/download/v0.2/Browser.Reviewer.v0.2.rar).
 
 ## What’s New (v0.2 — 2025-10-01)
 
-- **Better display scaling**: Improved support for different screen resolutions and high-DPI displays. UI elements, fonts and grids scale more consistently across laptops, external monitors and projectors.
+- **Better display scaling**: Improved support for different screen resolution, configurable font family and size more consistently across laptops, external monitors and projectors.
 - **Time-range + Categories fix**: Resolved the *SQL logic error* that could occur when clicking on categories while a **time-range search** was active.
 - **PDF exporting, improved**: More reliable layout, better table pagination, and clearer metadata on the first page.
 - **New: Export to HTML**: Export the current view as a standalone **HTML Report** with built-in **filtering** and **sorting** (works offline in any modern browser).
