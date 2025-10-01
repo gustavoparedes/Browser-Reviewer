@@ -31,10 +31,10 @@ Download compiled version [here](https://github.com/gustavoparedes/Browser-Revie
 ## Exporting
 
 ### PDF
-Use **File → Export → PDF** to generate a paginated report of the current grid.  
+Use **Export → PDF** to generate a paginated report of the current grid.  
 
 ### HTML
-Use **File → Export → HTML** to generate a standalone HTML file:
+Use **Export → HTML** to generate a standalone HTML file:
 - **Sortable columns** (click column headers)
 - **Quick filter** (search box)
 - **Self-contained** (no server required; opens in any modern browser)
@@ -152,7 +152,10 @@ or **advanced regular expression (RegExp)** searches.
 
 - Command-line execution (CLI mode)
 
+---
+
 C:\Users\gustavo\Desktop\Test\Browser Reviewer>>"Browser Reviewer.exe" -h
+
                     Browser Reviewer v0.2 - CLI
 
                     Usage:
@@ -171,9 +174,8 @@ C:\Users\gustavo\Desktop\Test\Browser Reviewer>>"Browser Reviewer.exe" -h
                       /?   -?   -h   --help
 
 
-C:\Users\gustavo\Desktop\Test\Browser Reviewer>
 
-
+---
 
 
 
