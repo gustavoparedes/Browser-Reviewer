@@ -11,7 +11,7 @@ Download compiled version [here](https://github.com/gustavoparedes/Browser-Revie
 - **Time-range + Categories fix**: Resolved the *SQL logic error* that could occur when clicking on categories while a **time-range search** was active.
 - **PDF exporting, improved**: More reliable layout, better table pagination, and clearer metadata on the first page.
 - **New: Export to HTML**: Export the current view as a standalone **HTML Report** with built-in **filtering** and **sorting** (works offline in any modern browser).
-- **HTML Reports**: Interactive headers for sorting, a search box for quick filtering, and a compact summary (rows, visible columns, sort, filters, export time, and time zone).
+- **HTML Reports**: Interactive headers for sorting, a search box for quick filtering, and a compact summary.
 
 ---
 
