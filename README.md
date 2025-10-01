@@ -21,7 +21,7 @@ Download compiled version [here](https://github.com/gustavoparedes/Browser-Revie
 - **Label Manager** to tag items and **Comments** to annotate findings.
 - Powerful search: simple text or **RegExp**.
 - **Time zone** offset control (consistent timestamps across cases).
-- **High-DPI aware** UI and better scaling on different screen resolutions. ← *new in v0.2*
+- **UI and better scaling** on different screen resolutions. ← *new in v0.2*
 - Export options:
   - **PDF** (improved pagination & layout). ← *v0.2 improvements*
   - **HTML Report** with client-side **filter/sort**. ← *new in v0.2*
@@ -45,7 +45,7 @@ Use **File → Export → HTML** to generate a standalone HTML file:
 ## Changelog
 
 ### v0.2 — 2025-10-01
-- Improved scaling for different resolutions / high-DPI displays.
+- Improved scaling for different resolutions.
 - Fixed *SQL logic error* when clicking categories with an active time-range search.
 - Better PDF export (layout, pagination, summary).
 - New **Export to HTML** and **interactive HTML Reports** (filter & sort).
