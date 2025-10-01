@@ -152,7 +152,7 @@ or **advanced regular expression (RegExp)** searches.
 
 - Command-line execution (CLI mode)
 
-C:\Users\gustavo\Desktop\Test\Browser Reviewer>
+C:\Users\gustavo\Desktop\Test\Browser Reviewer>>"Browser Reviewer.exe" -h
                     Browser Reviewer v0.2 - CLI
 
                     Usage:
