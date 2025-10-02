@@ -12,6 +12,7 @@ Download compiled version [here](https://github.com/gustavoparedes/Browser-Revie
 - **PDF exporting, improved**: More reliable layout, better table pagination, and clearer metadata on the first page.
 - **New: Export to HTML**: Export the current view as a standalone **HTML Report** with built-in **filtering** and **sorting** (works offline in any modern browser).
 - **HTML Reports**: Interactive headers for sorting, a search box for quick filtering, and a compact summary.
+- **Command-line execution (CLI mode)** for headless or automated runs **"Browser Reviewer.exe -h"**.
 
 ---
 
