@@ -3,7 +3,7 @@ Browser Reviewer is a portable forensic tool for analyzing user activity in Fire
 
 It requires no installation and can be executed directly from a USB drive or over a network share — ideal for forensic workflows with minimal footprint on the target system.
 
-Download compiled version [here](https://github.com/gustavoparedes/Browser-Reviewer/releases/download/v0.2/Browser.Reviewer.v0.2.rar).
+**Download compiled version** [here](https://github.com/gustavoparedes/Browser-Reviewer/releases/download/v0.2/Browser.Reviewer.v0.2.rar).
 
 ## What’s New (v0.2 — 2025-10-01)
 
