@@ -52,7 +52,7 @@ namespace Browser_Reviewer
 
         public Form1()
         {
-            Syncfusion.Licensing.SyncfusionLicenseProvider.RegisterLicense("Ngo9BigBOggjHTQxAR8/V1JFaF5cXGRCf1FpRmJGdld5fUVHYVZUTXxaS00DNHVRdkdlWXtfdnZXRmBeV0B0WkpWYEg=");
+            Syncfusion.Licensing.SyncfusionLicenseProvider.RegisterLicense("PUT YOUR SF LICENSE HERE");
             InitializeComponent();
             AppIcon.Apply(this);
             InitializeNumericUpDown();
