@@ -6,7 +6,7 @@ The tool allows analysts to tag, comment, and export reports in PDF.
 
 It requires no installation and can be executed directly from a USB drive or over a network share — ideal for forensic workflows with minimal footprint on the target system.
 
-**Download compiled version** [here](https://github.com/gustavoparedes/Browser-Reviewer/releases/download/v0.2/Browser.Reviewer.v0.2.rar).
+**Download compiled version** (https://github.com/gustavoparedes/Browser-Reviewer/releases/download/v1.0/Browser.Reviewer.v1.0.rar).
 
 
 ## What’s New (v1.0 — 2026-04-29)
