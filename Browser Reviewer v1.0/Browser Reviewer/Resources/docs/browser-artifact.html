@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Browser-Family Artifact | Browser Reviewer Docs</title>
+  <link rel="stylesheet" href="docs.css">
+</head>
+<body>
+  <header>
+    <div class="wrap topbar">
+      <div class="title-row">
+        <img class="doc-icon" data-doc-icon src="../browser_icon.png" alt="Browser">
+        <div>
+          <div class="eyebrow">Browser Reviewer v1.0</div>
+          <h1 data-i18n="title"></h1>
+          <p data-i18n="summary"></p>
+        </div>
+      </div>
+      <div class="toolbar">
+        <a class="button" href="index.html">Index</a>
+        <button data-lang="en">English</button>
+        <button data-lang="es">Español</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="facts">
+      <article>
+        <span data-label-en="Browser family" data-label-es="Familia de navegador"></span>
+        <strong data-i18n="browser"></strong>
+      </article>
+      <article>
+        <span data-label-en="Technical format" data-label-es="Formato tecnico"></span>
+        <strong data-i18n="family"></strong>
+      </article>
+      <article>
+        <span data-label-en="Confidence" data-label-es="Confianza"></span>
+        <strong data-i18n="confidence"></strong>
+      </article>
+    </section>
+
+    <section class="panel">
+      <h2 data-label-en="Where this evidence comes from" data-label-es="De donde sale esta evidencia"></h2>
+      <p data-i18n="source"></p>
+    </section>
+
+    <section class="panel">
+      <h2 data-label-en="What this may indicate" data-label-es="Que puede indicar"></h2>
+      <p data-i18n="potential"></p>
+      <div class="note" data-i18n="caution"></div>
+    </section>
+
+    <section class="panel">
+      <h2 data-label-en="Simple example" data-label-es="Ejemplo simple"></h2>
+      <p data-i18n="example"></p>
+    </section>
+
+    <section class="panel">
+      <div class="toolbar">
+        <input id="fieldSearch" type="search" placeholder="Search fields / Buscar campos">
+      </div>
+    </section>
+
+    <section class="field-list" id="fields"></section>
+  </main>
+
+  <footer>
+    <div class="wrap">Browser Reviewer Browser-Family Artifact Documentation</div>
+  </footer>
+
+  <script src="browser-docs-data.js"></script>
+  <script src="docs.js"></script>
+</body>
+</html>

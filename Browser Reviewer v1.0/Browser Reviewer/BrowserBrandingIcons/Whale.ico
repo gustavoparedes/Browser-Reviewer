@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="color-scheme" content="light" />
+
+    <!-- Early connection hints for external CDN domains -->
+    <link rel="preconnect" href="https://shared-whale.pstatic.net" />
+    <link rel="preconnect" href="https://wcs.naver.net" />
+    <link rel="dns-prefetch" href="https://installer-whale.pstatic.net" />
+    <link rel="dns-prefetch" href="https://static-whale.pstatic.net" />
+
+    <!-- Fallback values — overridden at runtime by PageMeta component based on locale -->
+    <title>NAVER Whale Browser</title>
+    <meta name="description" content="클릭은 줄이고 효율은 높이세요. 사이드바, 듀얼 탭, 화상회의 웨일온 등 다양한 기능을 지금 바로 경험하세요." />
+
+    <!-- Favicon -->
+    <link rel="icon" href="https://shared-whale.pstatic.net/favicon/icon.png" type="image/png" />
+    <link rel="apple-touch-icon" href="https://shared-whale.pstatic.net/favicon/icon.png" />
+    <link rel="apple-touch-icon" href="https://shared-whale.pstatic.net/favicon/icon180.png" sizes="180x180" />
+    <link rel="apple-touch-icon" href="https://shared-whale.pstatic.net/favicon/icon256.png" sizes="256x256" />
+    <link rel="apple-touch-icon" href="https://shared-whale.pstatic.net/favicon/icon512.png" sizes="512x512" />
+
+    <!-- Open Graph (static properties — locale-dependent ones set by PageMeta) -->
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="https://whale.naver.com/og/og_image_rectangle.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content="https://whale.naver.com/og/og_image_rectangle.png" />
+
+    <!--
+      TODO: Replace placeholder IDs before production deployment.
+      GTM_ID → actual Google Tag Manager container ID
+      TWITTER_PIXEL_ID → actual Twitter Pixel ID
+      Get values from the existing homepage env: NEXT_PUBLIC_GOOGLE_TAG_MANAGER_ID, NEXT_PUBLIC_TWITTER_PIXEL_ID
+    -->
+    <!-- Google Tag Manager (disabled until IDs are configured) -->
+    <!--
+    <script>
+      if (location.hostname === 'whale.naver.com') {
+        (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+        new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+        j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+        'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+        })(window,document,'script','dataLayer','GTM_ID');
+      }
+    </script>
+    -->
+
+    <!-- Twitter Pixel (disabled until IDs are configured) -->
+    <!--
+    <script>
+      if (location.hostname === 'whale.naver.com') {
+        !function(e,t,n,s,u,a){e.twq||(s=e.twq=function(){s.exe?s.exe.apply(s,arguments):
+        s.queue.push(arguments);},s.version='1.1',s.queue=[],u=t.createElement(n),u.async=!0,
+        u.src='//static.ads-twitter.com/uwt.js',a=t.getElementsByTagName(n)[0],
+        a.parentNode.insertBefore(u,a))}(window,document,'script');
+        twq('init','TWITTER_PIXEL_ID');twq('track','PageView');
+      }
+    </script>
+    -->
+
+    <!-- Kakao Pixel (production only) -->
+    <script>
+      if (location.hostname === 'whale.naver.com') {
+        var s = document.createElement('script');
+        s.type = 'text/javascript'; s.charset = 'UTF-8'; s.defer = true;
+        s.src = '//t1.daumcdn.net/kas/static/kp.js';
+        document.head.appendChild(s);
+      }
+    </script>
+
+    <!-- LCS (Naver Log Collection System) — init on all deployment phases (DEV/TEST/REAL) -->
+    <script>
+      if (/^(dev\.|test\.)?whale\.naver\.com$/.test(location.hostname)) {
+        window.lcs_SerName = 'lcs.naver.com';
+      }
+    </script>
+    <script defer src="/vendor/lcslog.v0.14.0.js"></script>
+
+    <!-- nClicks: ccsrv is read by the bundled SDK (src/vendor/nclicks.js) — init on all phases -->
+    <script>
+      if (/^(dev\.|test\.)?whale\.naver\.com$/.test(location.hostname)) {
+        window.ccsrv = 'cc.naver.com';
+      }
+    </script>
+    <script type="module" crossorigin src="https://shared-whale.pstatic.net/home2/assets/index-BwquERjw.js"></script>
+    <link rel="stylesheet" crossorigin href="https://shared-whale.pstatic.net/home2/assets/index-C9WkbesE.css">
+      <link rel="preload" as="image" href="https://shared-whale.pstatic.net/home2/assets/hero-bg-B6qML11p.png" />
+  </head>
+  <body>
+    <!-- Google Tag Manager (noscript) — disabled until GTM_ID is configured -->
+    <!--
+    <noscript>
+      <iframe src="https://www.googletagmanager.com/ns.html?id=GTM_ID"
+        height="0" width="0" style="display:none;visibility:hidden"></iframe>
+    </noscript>
+    -->
+    <div id="root"></div>
+    <noscript>
+      <div style="font-family: sans-serif; max-width: 800px; margin: 60px auto; padding: 0 24px; color: #222;">
+        <h1 style="font-size: 2rem; font-weight: 700; margin-bottom: 12px;">
+          네이버 웨일 브라우저 / NAVER Whale Browser
+        </h1>
+        <p style="font-size: 1.125rem; color: #555; margin-bottom: 24px;">
+          당신의 클릭보다 빠른 브라우저 · A browser faster than your click
+        </p>
+        <p style="font-size: 1rem; margin-bottom: 32px;">
+          일상을 여는 새로운 시작 네이버 웨일 · A new beginning that opens your everyday — NAVER Whale
+        </p>
+        <a href="https://whale.naver.com/ko/download/"
+           style="display: inline-block; background: #00c73c; color: #fff; font-size: 1rem; font-weight: 600;
+                  padding: 12px 28px; border-radius: 6px; text-decoration: none; margin-right: 12px;">
+          웨일 다운로드
+        </a>
+        <a href="https://whale.naver.com/en/download/"
+           style="display: inline-block; background: #00c73c; color: #fff; font-size: 1rem; font-weight: 600;
+                  padding: 12px 28px; border-radius: 6px; text-decoration: none;">
+          Download Whale
+        </a>
+        <p style="margin-top: 32px; font-size: 0.875rem; color: #888;">
+          이 페이지를 보려면 JavaScript를 활성화해 주세요. ·
+          Please enable JavaScript to view this page.
+        </p>
+      </div>
+    </noscript>
+  </body>
+</html>

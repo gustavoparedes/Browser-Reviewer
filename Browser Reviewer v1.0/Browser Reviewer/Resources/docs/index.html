@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Browser Reviewer Browser-Family Artifact Reference</title>
+  <link rel="stylesheet" href="docs.css">
+</head>
+<body>
+  <header>
+    <div class="wrap topbar">
+      <div>
+        <div class="eyebrow">Browser Reviewer v1.0</div>
+        <h1 data-label-en="Simple Guide to Browser Evidence" data-label-es="Guia Simple de Evidencia Web"></h1>
+        <p data-label-en="Plain-language help for understanding what Browser Reviewer shows." data-label-es="Ayuda en lenguaje claro para entender lo que muestra Browser Reviewer."></p>
+      </div>
+      <div class="toolbar">
+        <button data-lang="en">English</button>
+        <button data-lang="es">Español</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="hero">
+      <h2 data-label-en="Start here" data-label-es="Empiece aqui"></h2>
+      <p data-label-en="Choose the browser family and artifact you are reviewing. Each help page explains the evidence in simple words, gives examples, and tells you why each field matters." data-label-es="Elija la familia de navegador y el artefacto que esta revisando. Cada pagina explica la evidencia en palabras simples, da ejemplos y dice por que importa cada campo."></p>
+      <div class="note" data-label-en="Chrome-like means Chrome, Edge, Brave, Opera, Vivaldi, Yandex and compatible Chromium profiles. Firefox-like means Firefox and compatible Mozilla-style profiles." data-label-es="Chrome-like significa Chrome, Edge, Brave, Opera, Vivaldi, Yandex y perfiles Chromium compatibles. Firefox-like significa Firefox y perfiles compatibles estilo Mozilla."></div>
+    </section>
+
+    <section class="panel filters">
+      <input id="docSearch" type="search" placeholder="Search family or artifact / Buscar familia o artefacto">
+      <select id="browserFilter">
+        <option value="" data-label-en="All browser families" data-label-es="Todas las familias">All browser families</option>
+      </select>
+      <select id="artifactFilter">
+        <option value="" data-label-en="All artifacts" data-label-es="Todos los artefactos">All artifacts</option>
+      </select>
+    </section>
+
+    <section class="grid" id="artifactIndex"></section>
+  </main>
+
+  <footer>
+    <div class="wrap">Browser Reviewer Browser-Family Artifact Documentation</div>
+  </footer>
+
+  <script src="browser-docs-data.js"></script>
+  <script src="docs.js"></script>
+</body>
+</html>
