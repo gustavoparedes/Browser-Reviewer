@@ -1,10 +1,10 @@
 # Browser-Reviewer
 ---
-Browser Reviewer is a portable forensic tool for analyzing user activity in Firefox and Chrome-based browsers for Windows platforms. It extracts and displays:
+Browser Reviewer is a portable forensic tool for analyzing user activity in Firefox-based and Chrome-based browsers for Windows platforms. It extracts and displays:
 **Browsing history, downloads, bookmarks, autofill data, cookies, cache, sessions, extensions, saved logins metadata, Local Storage, Session Storage, and IndexedDB**. 
 The tool allows analysts to tag, comment, and export reports in PDF.
 
-It requires no installation and can be executed directly from a USB drive or over a network share — ideal for forensic workflows with minimal footprint on the target system.
+It requires no installation and can be executed directly from a USB drive ideal for forensic workflows with minimal footprint on the target system.
 
 **Download compiled version** [here](https://github.com/gustavoparedes/Browser-Reviewer/releases/download/v1.0/Browser.Reviewer.v1.0.rar).
 
@@ -12,7 +12,7 @@ It requires no installation and can be executed directly from a USB drive or ove
 ## What’s New (v1.0 — 2026-04-29)
 
 - **Major artifact coverage expansion**: Browser Reviewer now extracts and reviews **cookies, cache, sessions, extensions, saved logins metadata, Local Storage, Session Storage, and IndexedDB**, in addition to history, downloads, bookmarks, and autofill.
-- **Improved browser identification**: Better distinction between **Firefox-like** and **Chrome/Chromium-based** browsers, including known embedded containers such as **Outlook WView2, Visual Studio WView2, Windows Search WView2, OneDrive WView2, OpenAI Codex WView2, Steam Embedded Chromium, DeepL**, and others.
+- **Improved browser identification**: Better distinction between **Firefox-like** and **Chrome/Chromium-based** browsers, including known embedded containers such as **Outlook, Visual Studio, Windows Search, OneDrive , OpenAI Codex , Steam Embedded Chromium, DeepL**, and others.
 - **Stronger artifact traceability**: The `File` field now more consistently points to the real source artifact, reducing ambiguity during forensic review.
 - **Hardened Firefox extraction**: Improved handling of locked Firefox files, temporary files, profile artifacts, and Firefox-specific autofill data.
 - **Cleaner CLI workflow**: GUI and CLI extraction now share the same core parser path, reducing behavioral differences between interactive and headless runs.
@@ -24,7 +24,7 @@ It requires no installation and can be executed directly from a USB drive or ove
 
 - Extracts and visualizes browser artifacts from **Firefox-like** and **Chrome/Chromium-based** browsers, including embedded WebView2/Chromium containers.
 - Supports a broad set of artifacts: **history, downloads, bookmarks, autofill, cookies, cache, sessions, extensions, saved logins metadata, Local Storage, Session Storage, and IndexedDB**.
-- Identifies known browser/application containers such as **Firefox, Chrome, Edge, Brave, OneDrive WView2, OpenAI Codex WView2, Steam Embedded Chromium**, and other Chromium-based applications.
+- Identifies known browser/application containers such as **Firefox, Chrome, Edge, Brave, OneDrive, OpenAI Codex , Steam**, and other Chromium-based applications.
 - Preserves artifact source traceability through the `File` field, helping analysts understand where each record came from.
 - Provides **Label Manager** and **Comments** to tag, annotate, and organize findings.
 - Powerful search with simple text or **RegExp**, plus time-range filtering and time zone offset control.
@@ -241,25 +241,31 @@ IndexedDB
 
 ---
 
-C:\Users\gustavo\Desktop\Test\Browser Reviewer>>"Browser Reviewer.exe" -h
+C:\Users\gustavo\Desktop\Test\Browser Reviewer>>"BR.exe" -h
 
-                    Browser Reviewer v0.2 - CLI
+                   Browser Reviewer v1.0 - CLI
 
-                    Usage:
-                      Browser_Reviewer.exe <BaseNameOrPath(.bre)> <RootDirectoryToScan>
+Usage:
+  br.exe <BaseNameOrPath(.bre)> <RootDirectoryToScan>
+  br.exe --cli --out <BaseNameOrPath(.bre)> --scan <RootDirectoryToScan> [--overwrite]
 
-                    Parameters:
-                      <BaseNameOrPath(.bre)>   Name or full path of the .bre database file to create.
-                                               If no extension is provided, .bre will be added automatically.
-                      <RootDirectoryToScan>    Root folder where browser artifacts will be searched.
+Parameters:
+  <BaseNameOrPath(.bre)>   Name or full path of the .bre database file to create.
+                           If no extension is provided, .bre will be added automatically.
+  <RootDirectoryToScan>    Root folder where browser artifacts will be searched.
+  --overwrite              Replace an existing .bre file instead of stopping.
 
-                    Examples:
-                      Browser_Reviewer.exe MyCase "D:\Evidence\UserProfile"
-                      Browser_Reviewer.exe "C:\Cases\Case123.bre" "E:\Mounts\Image01"
+Extracted web artifacts:
+  History, downloads, bookmarks, autofill, cookies, cache, sessions, extensions,
+  saved logins metadata, local storage, session storage, and IndexedDB.
 
-                    Help flags:
-                      /?   -?   -h   --help
+Examples:
+  br.exe MyCase "D:\Evidence\UserProfile"
+  br.exe "C:\Cases\Case123.bre" "E:\Mounts\Image01"
+  br.exe --cli --out "C:\Cases\Case123.bre" --scan "E:\Mounts\Image01" --overwrite
 
+Help flags:
+  /?   -?   -h   --help
 
 
 ---
