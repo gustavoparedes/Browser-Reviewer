@@ -253,13 +253,16 @@ IndexedDB
 
 ---
 
-- Command-line execution (CLI mode)
+## Command-Line Usage
 
----
+Browser Reviewer can also run from the command line for headless or automated evidence processing.
 
-C:\Users\gustavo\Desktop\Test\Browser Reviewer>>"BR.exe" -h
+```powershell
+br.exe -h
+```
 
-                   Browser Reviewer v1.0 - CLI
+```text
+Browser Reviewer v1.1 - CLI
 
 Usage:
   br.exe <BaseNameOrPath(.bre)> <RootDirectoryToScan>
@@ -282,6 +285,7 @@ Examples:
 
 Help flags:
   /?   -?   -h   --help
+```
 
 
 ---
