@@ -81,7 +81,8 @@ To begin analyzing browser activity:
 ---
 1. Open / Create a project.
    
-<img width="596" height="469" alt="imagen" src="https://github.com/user-attachments/assets/8a083c8d-5d33-4659-b21b-927013d5853c" />
+<img width="601" height="464" alt="imagen" src="https://github.com/user-attachments/assets/bb697a20-ebb2-4702-8381-29ebd826dde1" />
+
 
 ---
 2. Select folder to scan.
