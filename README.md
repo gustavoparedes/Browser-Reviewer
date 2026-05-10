@@ -9,6 +9,12 @@ It requires no installation and can be executed directly from a USB drive ideal 
 **Download compiled version** [here](https://github.com/gustavoparedes/Browser-Reviewer/releases/download/v1.0/Browser.Reviewer.v1.0.rar).
 
 
+## What’s New (v1.1 — 2026-05-09)
+- **URLhaus intelligence**: Browser Reviewer adds URLhaus-based detection for known malware-distribution URLs and exposes those hits as URLhaus / Malware Distribution during review.
+- **Artifact categories**: Category/facet navigation is expanded beyond history, making it easier to drill into bookmarks, autofill, cookies, cache, sessions, extensions, saved logins metadata, Local Storage, Session Storage, and IndexedDB.
+- **Clearer media grouping**: Image, audio, and video file groups use more consistent media classification and icons across downloads and cache.
+
+
 ## What’s New (v1.0 — 2026-04-29)
 
 - **Major artifact coverage expansion**: Browser Reviewer now extracts and reviews **cookies, cache, sessions, extensions, saved logins metadata, Local Storage, Session Storage, and IndexedDB**, in addition to history, downloads, bookmarks, and autofill.
@@ -161,49 +167,58 @@ or **advanced regular expression (RegExp)** searches.
 
   Downloads
 
-<img width="1906" height="1033" alt="imagen" src="https://github.com/user-attachments/assets/646779f7-39e3-4c16-b0dd-bd6bd128c8d3" />
+<img width="1912" height="1035" alt="imagen" src="https://github.com/user-attachments/assets/02f9bd1f-c7f0-44e8-84fa-8bde048d880c" />
+
 
 
   Bookmarks
 
-<img width="1914" height="1034" alt="imagen" src="https://github.com/user-attachments/assets/db4b0d28-079d-4615-86c4-8847ab6aab71" />
+<img width="1916" height="1037" alt="imagen" src="https://github.com/user-attachments/assets/9e88e198-41fb-45f7-a24d-bb32668800c2" />
+
 
   Autofill
 
-<img width="1910" height="1036" alt="imagen" src="https://github.com/user-attachments/assets/ba497a47-e6d7-4708-b6ca-a741be4655d2" />
+<img width="1913" height="1036" alt="imagen" src="https://github.com/user-attachments/assets/9d6ebf9e-e23b-4272-a53a-27315b2148f8" />
+
 
   Cookies
 
-<img width="1910" height="1033" alt="imagen" src="https://github.com/user-attachments/assets/40291be0-c1eb-463c-9e7c-af89420abe7a" />
+<img width="1908" height="1035" alt="imagen" src="https://github.com/user-attachments/assets/0f739d19-254e-4be1-af19-fe044a187f8f" />
 
   Cache
 
-<img width="1909" height="1032" alt="imagen" src="https://github.com/user-attachments/assets/78728d9e-7d4e-4b98-b76c-8cf1cba2485f" />
+<img width="1917" height="1034" alt="imagen" src="https://github.com/user-attachments/assets/45140330-8e79-44e1-85a9-0c2a3aa9113e" />
+
 
 Sessions
 
-<img width="1907" height="1036" alt="imagen" src="https://github.com/user-attachments/assets/3c086c0e-374c-4181-8c45-cd2bff9eb201" />
+<img width="1917" height="1039" alt="imagen" src="https://github.com/user-attachments/assets/a0f5ffa7-99f0-42d4-b050-cc6be7fb1338" />
+
 
 Extensions
 
-<img width="1912" height="1033" alt="imagen" src="https://github.com/user-attachments/assets/efe33599-58e0-45fd-8a99-8ee65afab091" />
+<img width="1917" height="1038" alt="imagen" src="https://github.com/user-attachments/assets/1868defb-a65b-4f87-bcbe-5b6d4d854363" />
+
 
 
 Saved login metadata
 
-<img width="1912" height="1036" alt="imagen" src="https://github.com/user-attachments/assets/c19fed79-57ca-4f8d-ab84-eb5770829e83" />
+<img width="1919" height="1034" alt="imagen" src="https://github.com/user-attachments/assets/ce2f04ec-3207-4793-aa56-3f1b5cbc0afa" />
+
 
 Local storage
 
-<img width="1905" height="1035" alt="imagen" src="https://github.com/user-attachments/assets/80f7a53b-8c90-4d7a-91b1-41d3bd301b2e" />
+<img width="1916" height="1037" alt="imagen" src="https://github.com/user-attachments/assets/787105c5-6df4-4197-abc1-3b4fba9aa794" />
+
 
 Session storage
 
-<img width="1917" height="1032" alt="imagen" src="https://github.com/user-attachments/assets/d30bf39f-17b7-42a2-bfa3-742c5e72fc24" />
+<img width="1918" height="1039" alt="imagen" src="https://github.com/user-attachments/assets/5beb7636-9437-4118-83f7-ba905fcf8173" />
+
 
 IndexedDB
 
-<img width="1914" height="1033" alt="imagen" src="https://github.com/user-attachments/assets/3b8979fa-a845-4f6f-a9ee-d78d87f03f12" />
+<img width="1918" height="1037" alt="imagen" src="https://github.com/user-attachments/assets/a107f6b5-4f14-4d3a-a5a5-65e9252a004f" />
 
 
 
