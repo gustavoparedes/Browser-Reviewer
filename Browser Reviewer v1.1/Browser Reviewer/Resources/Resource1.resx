@@ -121,6 +121,9 @@
   <data name="activity_icon" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>activity_icon.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
+  <data name="audio_file_32" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>audio_file_32.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
   <data name="AdTrackingAnalytics" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>AdTrackingAnalytics.ico;System.Drawing.Icon, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
@@ -205,6 +208,9 @@
   <data name="id_icon" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>id_icon.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
+  <data name="image_file_32" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>image_file_32.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
   <data name="Internet_32" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>Internet-32.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
@@ -276,6 +282,9 @@
   </data>
   <data name="visit_icon" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>visit_icon.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="video_file_32" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>video_file_32.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
   <data name="Vivaldi" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>Vivaldi.ico;System.Drawing.Icon, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>

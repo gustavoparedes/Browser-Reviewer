@@ -63,7 +63,7 @@ namespace Browser_Reviewer
             };
             var title = new Label
             {
-                Text = "Browser Reviewer v1.0",
+                Text = "Browser Reviewer v1.1",
                 Font = new Font("Segoe UI Semibold", 20F, FontStyle.Bold, GraphicsUnit.Point, 0),
                 ForeColor = Color.FromArgb(24, 32, 43),
                 AutoSize = true,

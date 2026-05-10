@@ -308,7 +308,7 @@ namespace Browser_Reviewer
         }
 
         private static string GetHelpText() => @"
-Browser Reviewer v1.0 - CLI
+Browser Reviewer v1.1 - CLI
 
 Usage:
   br.exe <BaseNameOrPath(.bre)> <RootDirectoryToScan>

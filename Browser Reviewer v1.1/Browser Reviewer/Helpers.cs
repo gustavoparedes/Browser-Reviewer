@@ -725,13 +725,13 @@ namespace Browser_Reviewer
         { "cookies_data", new List<string> {
             "id", "Artifact_type", "Potential_activity", "Browser", "Host", "Name", "Value", "Path", "Created", "Expires", "LastAccessed",
             "IsSecure", "IsHttpOnly", "IsPersistent", "SameSite", "SourceScheme", "SourcePort",
-            "IsEncrypted", "File", "Label", "Comment"
+            "IsEncrypted", "ValueKind", "DecodedValuePreview", "DecoderNotes", "File", "Label", "Comment"
         }},
 
         { "cache_data", new List<string> {
             "id", "Artifact_type", "Potential_activity", "Browser", "Url", "Host", "ContentType", "CacheType", "HttpStatus", "Server",
             "FileSize", "Created", "Modified", "LastAccessed", "CacheFile", "CacheKey",
-            "BodySize", "BodySha256", "BodyStored", "BodyPreview", "DetectedFileType", "DetectedExtension",
+            "BodySize", "BodySha256", "BodyStored", "BodyPreview", "BodyKind", "DecodedBodyPreview", "BodyDecoderNotes", "DetectedFileType", "DetectedExtension",
             "File", "Label", "Comment"
         }},
 
@@ -739,25 +739,25 @@ namespace Browser_Reviewer
             "id", "Artifact_type", "Potential_activity", "Browser", "Url", "Action_url", "Signon_realm",
             "Username", "Username_field", "Password_field", "Scheme", "Times_used", "Created", "Last_used",
             "Password_changed", "Is_blacklisted", "Is_federated", "Password_present", "Encrypted_password_sha256",
-            "Encrypted_password_size", "Decryption_status", "Credential_artifact_value", "Store", "Login_guid",
+            "Encrypted_password_size", "Decryption_status", "Credential_artifact_value", "Credential_kind", "Decoded_credential_preview", "Credential_decoder_notes", "Store", "Login_guid",
             "File", "Label", "Comment"
         }},
 
         { "local_storage_data", new List<string> {
             "id", "Artifact_type", "Potential_activity", "Browser", "Origin", "Host", "Storage_key", "Value_preview",
-            "Value_size", "Value_sha256", "Source_kind", "Source_file", "Created", "Modified", "LastAccessed",
+            "Value_size", "Value_sha256", "Value_kind", "Decoded_value_preview", "Decoder_notes", "Source_kind", "Source_file", "Created", "Modified", "LastAccessed",
             "Parser_notes", "File", "Label", "Comment"
         }},
 
         { "session_storage_data", new List<string> {
             "id", "Artifact_type", "Potential_activity", "Browser", "Origin", "Host", "Storage_key", "Value_preview",
-            "Value_size", "Value_sha256", "Source_kind", "Source_file", "Created", "Modified", "LastAccessed",
+            "Value_size", "Value_sha256", "Value_kind", "Decoded_value_preview", "Decoder_notes", "Source_kind", "Source_file", "Created", "Modified", "LastAccessed",
             "Parser_notes", "File", "Label", "Comment"
         }},
 
         { "indexeddb_data", new List<string> {
             "id", "Artifact_type", "Potential_activity", "Browser", "Origin", "Host", "Storage_key", "Value_preview",
-            "Value_size", "Value_sha256", "Source_kind", "Source_file", "Created", "Modified", "LastAccessed",
+            "Value_size", "Value_sha256", "Value_kind", "Decoded_value_preview", "Decoder_notes", "Source_kind", "Source_file", "Created", "Modified", "LastAccessed",
             "Parser_notes", "File", "Label", "Comment"
         }},
 
@@ -797,13 +797,13 @@ namespace Browser_Reviewer
         { "AllCookies", new List<string> {
             "id", "Artifact_type", "Potential_activity", "Browser", "Host", "Name", "Value", "Path", "Created", "Expires", "LastAccessed",
             "IsSecure", "IsHttpOnly", "IsPersistent", "SameSite", "SourceScheme", "SourcePort",
-            "IsEncrypted", "File", "Label", "Comment"
+            "IsEncrypted", "ValueKind", "DecodedValuePreview", "DecoderNotes", "File", "Label", "Comment"
         }},
 
         { "AllCache", new List<string> {
             "id", "Artifact_type", "Potential_activity", "Browser", "Url", "Host", "ContentType", "CacheType", "HttpStatus", "Server",
             "FileSize", "Created", "Modified", "LastAccessed", "CacheFile", "CacheKey",
-            "BodySize", "BodySha256", "BodyStored", "BodyPreview", "DetectedFileType", "DetectedExtension",
+            "BodySize", "BodySha256", "BodyStored", "BodyPreview", "BodyKind", "DecodedBodyPreview", "BodyDecoderNotes", "DetectedFileType", "DetectedExtension",
             "File", "Label", "Comment"
         }},
 
@@ -823,25 +823,25 @@ namespace Browser_Reviewer
             "id", "Artifact_type", "Potential_activity", "Browser", "Url", "Action_url", "Signon_realm",
             "Username", "Username_field", "Password_field", "Scheme", "Times_used", "Created", "Last_used",
             "Password_changed", "Is_blacklisted", "Is_federated", "Password_present", "Encrypted_password_sha256",
-            "Encrypted_password_size", "Decryption_status", "Credential_artifact_value", "Store", "Login_guid",
+            "Encrypted_password_size", "Decryption_status", "Credential_artifact_value", "Credential_kind", "Decoded_credential_preview", "Credential_decoder_notes", "Store", "Login_guid",
             "File", "Label", "Comment"
         }},
 
         { "AllLocalStorage", new List<string> {
             "id", "Artifact_type", "Potential_activity", "Browser", "Origin", "Host", "Storage_key", "Value_preview",
-            "Value_size", "Value_sha256", "Source_kind", "Source_file", "Created", "Modified", "LastAccessed",
+            "Value_size", "Value_sha256", "Value_kind", "Decoded_value_preview", "Decoder_notes", "Source_kind", "Source_file", "Created", "Modified", "LastAccessed",
             "Parser_notes", "File", "Label", "Comment"
         }},
 
         { "AllSessionStorage", new List<string> {
             "id", "Artifact_type", "Potential_activity", "Browser", "Origin", "Host", "Storage_key", "Value_preview",
-            "Value_size", "Value_sha256", "Source_kind", "Source_file", "Created", "Modified", "LastAccessed",
+            "Value_size", "Value_sha256", "Value_kind", "Decoded_value_preview", "Decoder_notes", "Source_kind", "Source_file", "Created", "Modified", "LastAccessed",
             "Parser_notes", "File", "Label", "Comment"
         }},
 
         { "AllIndexedDb", new List<string> {
             "id", "Artifact_type", "Potential_activity", "Browser", "Origin", "Host", "Storage_key", "Value_preview",
-            "Value_size", "Value_sha256", "Source_kind", "Source_file", "Created", "Modified", "LastAccessed",
+            "Value_size", "Value_sha256", "Value_kind", "Decoded_value_preview", "Decoder_notes", "Source_kind", "Source_file", "Created", "Modified", "LastAccessed",
             "Parser_notes", "File", "Label", "Comment"
         }}
     };

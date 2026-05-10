@@ -10,9 +10,9 @@
     <AssemblyName>br</AssemblyName>
     <TargetName>br</TargetName>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
-    <Version>1.0.0</Version>
-    <AssemblyVersion>1.0.0.0</AssemblyVersion>
-    <FileVersion>1.0.0.0</FileVersion>
+    <Version>1.1.0</Version>
+    <AssemblyVersion>1.1.0.0</AssemblyVersion>
+    <FileVersion>1.1.0.0</FileVersion>
     <ApplicationIcon>Browser Reviewer.ico</ApplicationIcon>
     <DefaultItemExcludes>$(DefaultItemExcludes);bin\**;obj\**;publish\**</DefaultItemExcludes>
   </PropertyGroup>

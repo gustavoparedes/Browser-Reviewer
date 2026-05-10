@@ -52,7 +52,7 @@ namespace Browser_Reviewer
 
         public Form1()
         {
-            Syncfusion.Licensing.SyncfusionLicenseProvider.RegisterLicense("PUT YOUR SF LICENSE HERE");
+            Syncfusion.Licensing.SyncfusionLicenseProvider.RegisterLicense("Ngo9BigBOggjHTQxAR8/V1JFaF5cXGRCf1FpRmJGdld5fUVHYVZUTXxaS00DNHVRdkdlWXtfdnZXRmBeV0B0WkpWYEg=");
             InitializeComponent();
             AppIcon.Apply(this);
             InitializeNumericUpDown();
@@ -801,6 +801,147 @@ namespace Browser_Reviewer
             return string.IsNullOrWhiteSpace(value) ? "(no data)" : value;
         }
 
+        private Dictionary<string, int> GetBookmarkCategoryCounts(string browserName)
+        {
+            Dictionary<string, int> counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var row in GetBookmarkFacetRows(browserName))
+            {
+                string category = MyTools.Evaluatecategory(row.Url ?? string.Empty);
+                counts[category] = counts.TryGetValue(category, out int count) ? count + 1 : 1;
+            }
+
+            return counts;
+        }
+
+        private string BuildBookmarksByCategoryQuery(string browserName, string? category)
+        {
+            int utcOffset = Helpers.utcOffset;
+            string offset = utcOffset == 0 ? string.Empty : (utcOffset > 0 ? $"+{utcOffset} hours" : $"{utcOffset} hours");
+            string dateAddedExpr = utcOffset == 0
+                ? "STRFTIME('%Y-%m-%d %H:%M:%f', DateAdded)"
+                : $"STRFTIME('%Y-%m-%d %H:%M:%f', DateAdded, '{offset}')";
+            string lastModifiedExpr = utcOffset == 0
+                ? "STRFTIME('%Y-%m-%d %H:%M:%f', LastModified)"
+                : $"STRFTIME('%Y-%m-%d %H:%M:%f', LastModified, '{offset}')";
+            string browser = EscapeSqlLiteral(browserName);
+            string categoryValue = string.IsNullOrWhiteSpace(category) ? "NULL" : $"'{EscapeSqlLiteral(category)}'";
+
+            string chromeWhere;
+            string firefoxWhere;
+            if (string.IsNullOrWhiteSpace(category))
+            {
+                string filter = CurrentAndFilter(
+                    SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Type", "Title", "URL", "Parent_name"),
+                    SearchSql.TimeCondition("DateAdded", "LastModified"));
+                chromeWhere = $"Browser = '{browser}' {filter}";
+                firefoxWhere = $"Browser = '{browser}' {filter}";
+            }
+            else
+            {
+                List<int> chromeIds = new List<int>();
+                List<int> firefoxIds = new List<int>();
+
+                foreach (var row in GetBookmarkFacetRows(browserName))
+                {
+                    if (!string.Equals(MyTools.Evaluatecategory(row.Url ?? string.Empty), category, StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    if (string.Equals(row.TableName, "bookmarks_Chrome", StringComparison.OrdinalIgnoreCase))
+                        chromeIds.Add(row.Id);
+                    else if (string.Equals(row.TableName, "bookmarks_Firefox", StringComparison.OrdinalIgnoreCase))
+                        firefoxIds.Add(row.Id);
+                }
+
+                chromeWhere = chromeIds.Count == 0 ? "1 = 0" : $"id IN ({string.Join(",", chromeIds)})";
+                firefoxWhere = firefoxIds.Count == 0 ? "1 = 0" : $"id IN ({string.Join(",", firefoxIds)})";
+            }
+
+            return $@"
+                SELECT id, Artifact_type, Potential_activity, Browser, {categoryValue} AS Category, Type, Title, URL,
+                       {dateAddedExpr} AS DateAdded,
+                       {lastModifiedExpr} AS LastModified,
+                       Parent_name, File, Label, Comment
+                FROM bookmarks_Chrome
+                WHERE {chromeWhere}
+                UNION ALL
+                SELECT id, Artifact_type, Potential_activity, Browser, {categoryValue} AS Category, Type, Title, URL,
+                       {dateAddedExpr} AS DateAdded,
+                       {lastModifiedExpr} AS LastModified,
+                       Parent_name, File, Label, Comment
+                FROM bookmarks_Firefox
+                WHERE {firefoxWhere};";
+        }
+
+        private List<(string TableName, int Id, string? Url)> GetBookmarkFacetRows(string browserName)
+        {
+            List<(string TableName, int Id, string? Url)> rows = new List<(string TableName, int Id, string? Url)>();
+            string browser = EscapeSqlLiteral(browserName);
+            string filter = CurrentAndFilter(
+                SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Type", "Title", "URL", "Parent_name"),
+                SearchSql.TimeCondition("DateAdded", "LastModified"));
+
+            string query = $@"
+                SELECT 'bookmarks_Chrome' AS TableName, id, URL
+                FROM bookmarks_Chrome
+                WHERE Browser = '{browser}' {filter}
+                UNION ALL
+                SELECT 'bookmarks_Firefox' AS TableName, id, URL
+                FROM bookmarks_Firefox
+                WHERE Browser = '{browser}' {filter};";
+
+            using SQLiteConnection connection = new SQLiteConnection(Helpers.chromeViewerConnectionString);
+            connection.Open();
+            using SQLiteCommand command = new SQLiteCommand(query, connection);
+            SearchSql.AddParameters(command);
+            using SQLiteDataReader reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                rows.Add((
+                    reader.GetString(0),
+                    reader.GetInt32(1),
+                    reader.IsDBNull(2) ? null : reader.GetString(2)));
+            }
+
+            return rows;
+        }
+
+        private Image GetHistoryCategoryIcon(string category)
+        {
+            return category switch
+            {
+                "Ad Tracking and Analytics" => Resource1.AdTrackingAnalytics.ToBitmap(),
+                "AI" => Resource1.AI.ToBitmap(),
+                "Banking" => Resource1.Banking.ToBitmap(),
+                "Cloud Storage Services" => Resource1.CloudStorageServices.ToBitmap(),
+                "Code Hosting" => Resource1.CodeHosting.ToBitmap(),
+                "Entertainment" => Resource1.Entertainment.ToBitmap(),
+                "Firefox" => Resource1.Firefox.ToBitmap(),
+                "Facebook" => Resource1.Facebook.ToBitmap(),
+                "File Encryption Tools" => Resource1.FileEncryptionTools.ToBitmap(),
+                "Google" => Resource1.Google.ToBitmap(),
+                "Lan Addresses Browsing" => Resource1.LanAddressesBrowsing.ToBitmap(),
+                "Local Files" => Resource1.LocalFiles.ToBitmap(),
+                "News" => Resource1.News.ToBitmap(),
+                "Online Office Suite" => Resource1.OnlineOfficeSuite.ToBitmap(),
+                "Other" => Resource1.Other.ToBitmap(),
+                "Search Engine" => Resource1.SearchEngine.ToBitmap(),
+                "Shopping" => Resource1.Shopping.ToBitmap(),
+                "Social Media" => Resource1.SocialMedia.ToBitmap(),
+                "Technical Forums" => Resource1.TechicalForums.ToBitmap(),
+                "Webmail" => Resource1.Webmail.ToBitmap(),
+                "YouTube" => Resource1.YouTube.ToBitmap(),
+                "Gaming Platforms" => Resource1.GamingPlatforms.ToBitmap(),
+                "Adult Content Sites" => Resource1.AdultContentSites.ToBitmap(),
+                "Cryptocurrency Platforms" => Resource1.CryptocurrencyPlatforms.ToBitmap(),
+                "Hacking and Cybersecurity Sites" => Resource1.HackingCybersecuritySites.ToBitmap(),
+                "URLhaus / Malware Distribution" => Resource1.HackingCybersecuritySites.ToBitmap(),
+                "Airlines" => Resource1.Airlines.ToBitmap(),
+                "Hotels and Rentals" => Resource1.Hotels.ToBitmap(),
+                _ => Resource1.Unknown.ToBitmap(),
+            };
+        }
+
 
 
 
@@ -1042,7 +1183,8 @@ namespace Browser_Reviewer
                            {SearchSql.DateExpr("Created")} AS Created,
                            {SearchSql.DateExpr("Expires")} AS Expires,
                            {SearchSql.DateExpr("LastAccessed")} AS LastAccessed,
-                           IsSecure, IsHttpOnly, IsPersistent, SameSite, SourceScheme, SourcePort, IsEncrypted, File, Label, Comment
+                           IsSecure, IsHttpOnly, IsPersistent, SameSite, SourceScheme, SourcePort, IsEncrypted,
+                           ValueKind, DecodedValuePreview, DecoderNotes, File, Label, Comment
                     FROM cookies_data
                     WHERE id = {sourceId};",
                 "cache_data" => BuildCacheSelectQuery($"WHERE id = {sourceId}"),
@@ -1392,6 +1534,12 @@ namespace Browser_Reviewer
         {
             var columnasSinFiltro = new List<string> { "id", "Url", "Visit_time", "Last_visit_time", "Visit_duration", "Start_time", "End_time", "DateAdded", "LastModified", "LastUsed" };
 
+            if (string.Equals(e.Column.MappingName, "SearchHitText", StringComparison.OrdinalIgnoreCase))
+            {
+                e.Column.Visible = false;
+                return;
+            }
+
             if (columnasSinFiltro.Contains(e.Column.MappingName))
             {
                 e.Column.AllowFiltering = false;
@@ -1492,7 +1640,7 @@ namespace Browser_Reviewer
             Helpers.db_name = projectPath;
             Helpers.chromeViewerConnectionString = $"Data Source={Helpers.db_name};Version=3;";
             Tools.CreateDatabase(Helpers.chromeViewerConnectionString);
-            this.Text = "Browser Reviewer v1.0 is working on:   " + Helpers.db_name;
+            this.Text = "Browser Reviewer v1.1 is working on:   " + Helpers.db_name;
             enableButtons();
             Helpers.labelsTable = new DataTable();
             ResetSearchState();
@@ -1510,7 +1658,7 @@ namespace Browser_Reviewer
                 Helpers.db_name = projectPath;
                 Helpers.chromeViewerConnectionString = $"Data Source={Helpers.db_name};Version=3;";
                 Tools.CreateDatabase(Helpers.chromeViewerConnectionString);
-                this.Text = "Browser Reviewer v1.0 is working on:   " + Helpers.db_name;
+                this.Text = "Browser Reviewer v1.1 is working on:   " + Helpers.db_name;
                 setLabels();
 
                 ShowFullTimelineWebActivity();
@@ -1725,7 +1873,7 @@ namespace Browser_Reviewer
 
             disableButtons();
 
-            this.Text = "Browser Reviewer v1.0";
+            this.Text = "Browser Reviewer v1.1";
             BeginInvoke(new System.Action(async () => await ShowStartupDialogAsync()));
         }
 
@@ -1793,6 +1941,11 @@ namespace Browser_Reviewer
                 DataRowView? dataRowView = sfDataGrid1.SelectedItem as DataRowView;
                 if (dataRowView != null)
                 {
+                    if (TryRenderCacheDetailFromTimelineRow(dataRowView))
+                    {
+                        return;
+                    }
+
                     if (IsCacheRow(dataRowView))
                     {
                         RenderCachePreview(dataRowView);
@@ -1822,6 +1975,40 @@ namespace Browser_Reviewer
                     }
                 }
                 highlight_Text();
+            }
+        }
+
+
+        private bool TryRenderCacheDetailFromTimelineRow(DataRowView row)
+        {
+            string sourceTable = GetRowValue(row, "Source_table");
+            if (!string.Equals(sourceTable, "cache_data", StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            string sourceIdText = GetRowValue(row, "Source_id");
+            if (!int.TryParse(sourceIdText, out int sourceId) || string.IsNullOrWhiteSpace(Helpers.chromeViewerConnectionString))
+                return false;
+
+            try
+            {
+                string query = BuildCacheSelectQuery($"WHERE id = {sourceId}");
+                using SQLiteConnection connection = new SQLiteConnection(Helpers.chromeViewerConnectionString);
+                connection.Open();
+                using SQLiteCommand command = new SQLiteCommand(query, connection);
+                using SQLiteDataAdapter adapter = new SQLiteDataAdapter(command);
+                DataTable table = new DataTable();
+                adapter.Fill(table);
+
+                if (table.Rows.Count == 0)
+                    return false;
+
+                DataView view = table.DefaultView;
+                RenderCachePreview(view[0]);
+                return true;
+            }
+            catch
+            {
+                return false;
             }
         }
 
@@ -2581,7 +2768,7 @@ namespace Browser_Reviewer
                         Helpers.db_name = OpenFileDialog.FileName;
                         Helpers.chromeViewerConnectionString = $"Data Source={Helpers.db_name};Version=3;";
                         Tools.CreateDatabase(Helpers.chromeViewerConnectionString);
-                        this.Text = "Browser Reviewer v1.0 is working on:   " + Helpers.db_name;
+                        this.Text = "Browser Reviewer v1.1 is working on:   " + Helpers.db_name;
                         setLabels();
 
                         ShowFullTimelineWebActivity();
@@ -3080,6 +3267,7 @@ namespace Browser_Reviewer
                         "Adult Content Sites" => Resource1.AdultContentSites.ToBitmap(),
                         "Cryptocurrency Platforms" => Resource1.CryptocurrencyPlatforms.ToBitmap(),
                         "Hacking and Cybersecurity Sites" => Resource1.HackingCybersecuritySites.ToBitmap(),
+                        "URLhaus / Malware Distribution" => Resource1.HackingCybersecuritySites.ToBitmap(),
                         "Airlines" => Resource1.Airlines.ToBitmap(),
                         "Hotels and Rentals" => Resource1.Hotels.ToBitmap(),
                         _ => Resource1.Unknown.ToBitmap(),
@@ -3300,14 +3488,14 @@ namespace Browser_Reviewer
                     UNION ALL SELECT 1 FROM bookmarks_Chrome {SearchSql.Where(SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Type", "Title", "URL", "Parent_name", "Guid", "ChromeId"), SearchSql.TimeCondition("DateAdded", "DateLastUsed", "LastModified"), SearchSql.LabelCondition())}
                     UNION ALL SELECT 1 FROM bookmarks_Firefox {SearchSql.Where(SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Type", "Parent_name", "Title", "URL", "PageTitle", "AnnoContent", "AnnoName"), SearchSql.TimeCondition("DateAdded", "LastModified", "LastVisitDate"), SearchSql.LabelCondition())}
                     UNION ALL SELECT 1 FROM autofill_data {SearchSql.Where(SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "FieldName", "Value"), SearchSql.TimeCondition("LastUsed", "FirstUsed"), SearchSql.LabelCondition())}
-                    UNION ALL SELECT 1 FROM cookies_data {SearchSql.Where(SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Host", "Name", "Value", "Path"), SearchSql.TimeCondition("Created", "Expires", "LastAccessed"), SearchSql.LabelCondition())}
-                    UNION ALL SELECT 1 FROM cache_data {SearchSql.Where(SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Url", "Host", "ContentType", "CacheType", "Server", "CacheFile", "CacheKey", "BodyPreview", "DetectedFileType", "DetectedExtension"), SearchSql.TimeCondition("Created", "Modified", "LastAccessed"), SearchSql.LabelCondition())}
+                    UNION ALL SELECT 1 FROM cookies_data {SearchSql.Where(SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Host", "Name", "Value", "ValueKind", "DecodedValuePreview", "DecoderNotes", "Path"), SearchSql.TimeCondition("Created", "Expires", "LastAccessed"), SearchSql.LabelCondition())}
+                    UNION ALL SELECT 1 FROM cache_data {SearchSql.Where(SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Url", "Host", "ContentType", "CacheType", "Server", "CacheFile", "CacheKey", "BodyPreview", "BodyKind", "DecodedBodyPreview", "BodyDecoderNotes", "DetectedFileType", "DetectedExtension"), SearchSql.TimeCondition("Created", "Modified", "LastAccessed"), SearchSql.LabelCondition())}
                     UNION ALL SELECT 1 FROM session_data {SearchSql.Where(SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Url", "Title", "OriginalUrl", "Referrer", "SessionFile", "SourceType"), SearchSql.TimeCondition("LastAccessed", "Created"), SearchSql.LabelCondition())}
                     UNION ALL SELECT 1 FROM extension_data {SearchSql.Where(SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "ExtensionId", "Name", "Version", "Description", "Author", "HomepageUrl", "UpdateUrl", "Permissions", "HostPermissions", "ExtensionPath", "SourceFile"), SearchSql.TimeCondition("InstallTime", "LastUpdateTime"), SearchSql.LabelCondition())}
-                    UNION ALL SELECT 1 FROM saved_logins_data {SearchSql.Where(SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Url", "Action_url", "Signon_realm", "Username", "Username_field", "Password_field", "Scheme", "Decryption_status", "Credential_artifact_value", "Store", "Login_guid"), SearchSql.TimeCondition("Created", "Last_used", "Password_changed"), SearchSql.LabelCondition())}
-                    UNION ALL SELECT 1 FROM local_storage_data {SearchSql.Where(SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Origin", "Host", "Storage_key", "Value_preview", "Value_sha256", "Source_kind", "Source_file", "Parser_notes"), SearchSql.TimeCondition("Created", "Modified", "LastAccessed"), SearchSql.LabelCondition())}
-                    UNION ALL SELECT 1 FROM session_storage_data {SearchSql.Where(SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Origin", "Host", "Storage_key", "Value_preview", "Value_sha256", "Source_kind", "Source_file", "Parser_notes"), SearchSql.TimeCondition("Created", "Modified", "LastAccessed"), SearchSql.LabelCondition())}
-                    UNION ALL SELECT 1 FROM indexeddb_data {SearchSql.Where(SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Origin", "Host", "Storage_key", "Value_preview", "Value_sha256", "Source_kind", "Source_file", "Parser_notes"), SearchSql.TimeCondition("Created", "Modified", "LastAccessed"), SearchSql.LabelCondition())}
+                    UNION ALL SELECT 1 FROM saved_logins_data {SearchSql.Where(SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Url", "Action_url", "Signon_realm", "Username", "Username_field", "Password_field", "Scheme", "Decryption_status", "Credential_artifact_value", "Credential_kind", "Decoded_credential_preview", "Credential_decoder_notes", "Store", "Login_guid"), SearchSql.TimeCondition("Created", "Last_used", "Password_changed"), SearchSql.LabelCondition())}
+                    UNION ALL SELECT 1 FROM local_storage_data {SearchSql.Where(SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Origin", "Host", "Storage_key", "Value_preview", "Value_kind", "Decoded_value_preview", "Decoder_notes", "Value_sha256", "Source_kind", "Source_file", "Parser_notes"), SearchSql.TimeCondition("Created", "Modified", "LastAccessed"), SearchSql.LabelCondition())}
+                    UNION ALL SELECT 1 FROM session_storage_data {SearchSql.Where(SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Origin", "Host", "Storage_key", "Value_preview", "Value_kind", "Decoded_value_preview", "Decoder_notes", "Value_sha256", "Source_kind", "Source_file", "Parser_notes"), SearchSql.TimeCondition("Created", "Modified", "LastAccessed"), SearchSql.LabelCondition())}
+                    UNION ALL SELECT 1 FROM indexeddb_data {SearchSql.Where(SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Origin", "Host", "Storage_key", "Value_preview", "Value_kind", "Decoded_value_preview", "Decoder_notes", "Value_sha256", "Source_kind", "Source_file", "Parser_notes"), SearchSql.TimeCondition("Created", "Modified", "LastAccessed"), SearchSql.LabelCondition())}
                 );";
         }
 
@@ -3340,95 +3528,110 @@ namespace Browser_Reviewer
             return $@"
                 SELECT * FROM (
                     SELECT id, Artifact_type, Potential_activity, 'results' AS Source_table, id AS Source_id, Browser, 'History' AS Artifact, {visitTime} AS Activity_time, {lastVisitTime} AS Secondary_time,
-                           Url, Title, Category AS Detail, File, Label, Comment
+                           Url, Title, Category AS Detail, File, Label, Comment,
+                           COALESCE(Artifact_type, '') || ' ' || COALESCE(Potential_activity, '') || ' ' || COALESCE(Browser, '') || ' ' || COALESCE(Category, '') || ' ' || COALESCE(Url, '') || ' ' || COALESCE(Title, '') AS SearchHitText
                     FROM results
                     {SearchSql.Where(SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Category", "Url", "Title"), SearchSql.TimeCondition("Visit_time", "Last_visit_time"), SearchSql.LabelCondition())}
 
                     UNION ALL
                     SELECT id, Artifact_type, Potential_activity, 'firefox_results' AS Source_table, id AS Source_id, Browser, 'History' AS Artifact, {visitTime} AS Activity_time, {lastVisitTime} AS Secondary_time,
-                           Url, Title, COALESCE(Navigation_context, Category, '') AS Detail, File, Label, Comment
+                           Url, Title, COALESCE(Navigation_context, Category, '') AS Detail, File, Label, Comment,
+                           COALESCE(Artifact_type, '') || ' ' || COALESCE(Potential_activity, '') || ' ' || COALESCE(Browser, '') || ' ' || COALESCE(Category, '') || ' ' || COALESCE(Url, '') || ' ' || COALESCE(Title, '') || ' ' || COALESCE(Transition, '') || ' ' || COALESCE(Navigation_context, '') || ' ' || COALESCE(User_action_likelihood, '') AS SearchHitText
                     FROM firefox_results
                     {SearchSql.Where(SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Category", "Url", "Title", "Transition", "Navigation_context", "User_action_likelihood"), SearchSql.TimeCondition("Visit_time", "Last_visit_time"), SearchSql.LabelCondition())}
 
                     UNION ALL
                     SELECT id, Artifact_type, Potential_activity, 'chrome_downloads' AS Source_table, id AS Source_id, Browser, 'Download' AS Artifact, {endTime} AS Activity_time, {startTime} AS Secondary_time,
                            COALESCE(Tab_url, Site_url, referrer, Target_path, Current_path) AS Url, Current_path AS Title,
-                           COALESCE(Url_chain, Mime_type, State, '') AS Detail, File, Label, Comment
+                           COALESCE(Url_chain, Mime_type, State, '') AS Detail, File, Label, Comment,
+                           COALESCE(Artifact_type, '') || ' ' || COALESCE(Potential_activity, '') || ' ' || COALESCE(Browser, '') || ' ' || COALESCE(Current_path, '') || ' ' || COALESCE(Target_path, '') || ' ' || COALESCE(Url_chain, '') || ' ' || COALESCE(State, '') || ' ' || COALESCE(referrer, '') || ' ' || COALESCE(Site_url, '') || ' ' || COALESCE(Tab_url, '') || ' ' || COALESCE(Mime_type, '') AS SearchHitText
                     FROM chrome_downloads
                     {SearchSql.Where(SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Current_path", "Target_path", "Url_chain", "State", "referrer", "Site_url", "Tab_url", "Mime_type"), SearchSql.TimeCondition("Start_time", "End_time"), SearchSql.LabelCondition())}
 
                     UNION ALL
                     SELECT id, Artifact_type, Potential_activity, 'firefox_downloads' AS Source_table, id AS Source_id, Browser, 'Download' AS Artifact, {endTime} AS Activity_time, {lastVisitTime} AS Secondary_time,
-                           Source_url AS Url, Current_path AS Title, COALESCE(State, '') AS Detail, File, Label, Comment
+                           Source_url AS Url, Current_path AS Title, COALESCE(State, '') AS Detail, File, Label, Comment,
+                           COALESCE(Artifact_type, '') || ' ' || COALESCE(Potential_activity, '') || ' ' || COALESCE(Browser, '') || ' ' || COALESCE(Current_path, '') || ' ' || COALESCE(Source_url, '') || ' ' || COALESCE(Title, '') || ' ' || COALESCE(State, '') AS SearchHitText
                     FROM firefox_downloads
                     {SearchSql.Where(SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Current_path", "Source_url", "Title", "State"), SearchSql.TimeCondition("End_time", "Last_visit_time"), SearchSql.LabelCondition())}
 
                     UNION ALL
                     SELECT id, Artifact_type, Potential_activity, 'bookmarks_Chrome' AS Source_table, id AS Source_id, Browser, 'Bookmark' AS Artifact, {dateAdded} AS Activity_time, {lastModified} AS Secondary_time,
-                           URL AS Url, Title, COALESCE(Type, Parent_name, '') AS Detail, File, Label, Comment
+                           URL AS Url, Title, COALESCE(Type, Parent_name, '') AS Detail, File, Label, Comment,
+                           COALESCE(Artifact_type, '') || ' ' || COALESCE(Potential_activity, '') || ' ' || COALESCE(Browser, '') || ' ' || COALESCE(Type, '') || ' ' || COALESCE(Title, '') || ' ' || COALESCE(URL, '') || ' ' || COALESCE(Parent_name, '') || ' ' || COALESCE(Guid, '') || ' ' || COALESCE(CAST(ChromeId AS TEXT), '') AS SearchHitText
                     FROM bookmarks_Chrome
                     {SearchSql.Where(SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Type", "Title", "URL", "Parent_name", "Guid", "ChromeId"), SearchSql.TimeCondition("DateAdded", "DateLastUsed", "LastModified"), SearchSql.LabelCondition())}
 
                     UNION ALL
                     SELECT id, Artifact_type, Potential_activity, 'bookmarks_Firefox' AS Source_table, id AS Source_id, Browser, 'Bookmark' AS Artifact, {dateAdded} AS Activity_time, {lastModified} AS Secondary_time,
-                           URL AS Url, COALESCE(Title, PageTitle) AS Title, COALESCE(Type, Parent_name, AnnoName, '') AS Detail, File, Label, Comment
+                           URL AS Url, COALESCE(Title, PageTitle) AS Title, COALESCE(Type, Parent_name, AnnoName, '') AS Detail, File, Label, Comment,
+                           COALESCE(Artifact_type, '') || ' ' || COALESCE(Potential_activity, '') || ' ' || COALESCE(Browser, '') || ' ' || COALESCE(Type, '') || ' ' || COALESCE(Parent_name, '') || ' ' || COALESCE(Title, '') || ' ' || COALESCE(URL, '') || ' ' || COALESCE(PageTitle, '') || ' ' || COALESCE(AnnoContent, '') || ' ' || COALESCE(AnnoName, '') AS SearchHitText
                     FROM bookmarks_Firefox
                     {SearchSql.Where(SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Type", "Parent_name", "Title", "URL", "PageTitle", "AnnoContent", "AnnoName"), SearchSql.TimeCondition("DateAdded", "LastModified", "LastVisitDate"), SearchSql.LabelCondition())}
 
                     UNION ALL
                     SELECT id, Artifact_type, Potential_activity, 'autofill_data' AS Source_table, id AS Source_id, Browser, 'Autofill' AS Artifact, {lastUsed} AS Activity_time, {firstUsed} AS Secondary_time,
-                           Value AS Url, FieldName AS Title, COALESCE(CAST(TimesUsed AS TEXT), CAST(Count AS TEXT), '') AS Detail, File, Label, Comment
+                           Value AS Url, FieldName AS Title, COALESCE(CAST(TimesUsed AS TEXT), CAST(Count AS TEXT), '') AS Detail, File, Label, Comment,
+                           COALESCE(Artifact_type, '') || ' ' || COALESCE(Potential_activity, '') || ' ' || COALESCE(Browser, '') || ' ' || COALESCE(FieldName, '') || ' ' || COALESCE(Value, '') AS SearchHitText
                     FROM autofill_data
                     {SearchSql.Where(SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "FieldName", "Value"), SearchSql.TimeCondition("LastUsed", "FirstUsed"), SearchSql.LabelCondition())}
 
                     UNION ALL
                     SELECT id, Artifact_type, Potential_activity, 'cookies_data' AS Source_table, id AS Source_id, Browser, 'Cookie' AS Artifact, {lastAccessed} AS Activity_time, {created} AS Secondary_time,
-                           Host AS Url, Name AS Title, Path AS Detail, File, Label, Comment
+                           Host AS Url, Name AS Title, COALESCE(DecodedValuePreview, ValueKind, Path, '') AS Detail, File, Label, Comment,
+                           COALESCE(Artifact_type, '') || ' ' || COALESCE(Potential_activity, '') || ' ' || COALESCE(Browser, '') || ' ' || COALESCE(Host, '') || ' ' || COALESCE(Name, '') || ' ' || COALESCE(Value, '') || ' ' || COALESCE(ValueKind, '') || ' ' || COALESCE(DecodedValuePreview, '') || ' ' || COALESCE(DecoderNotes, '') || ' ' || COALESCE(Path, '') AS SearchHitText
                     FROM cookies_data
-                    {SearchSql.Where(SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Host", "Name", "Value", "Path"), SearchSql.TimeCondition("Created", "Expires", "LastAccessed"), SearchSql.LabelCondition())}
+                    {SearchSql.Where(SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Host", "Name", "Value", "ValueKind", "DecodedValuePreview", "DecoderNotes", "Path"), SearchSql.TimeCondition("Created", "Expires", "LastAccessed"), SearchSql.LabelCondition())}
 
                     UNION ALL
                     SELECT id, Artifact_type, Potential_activity, 'cache_data' AS Source_table, id AS Source_id, Browser, 'Cache' AS Artifact, {lastAccessed} AS Activity_time, {created} AS Secondary_time,
-                           Url, COALESCE(DetectedFileType, ContentType, CacheType) AS Title, COALESCE(Host, CacheKey, CacheFile, '') AS Detail, File, Label, Comment
+                           Url, COALESCE(DetectedFileType, ContentType, CacheType) AS Title, COALESCE(Host, CacheKey, CacheFile, '') AS Detail, File, Label, Comment,
+                           COALESCE(Artifact_type, '') || ' ' || COALESCE(Potential_activity, '') || ' ' || COALESCE(Browser, '') || ' ' || COALESCE(Url, '') || ' ' || COALESCE(Host, '') || ' ' || COALESCE(ContentType, '') || ' ' || COALESCE(CacheType, '') || ' ' || COALESCE(Server, '') || ' ' || COALESCE(CacheFile, '') || ' ' || COALESCE(CacheKey, '') || ' ' || COALESCE(BodyPreview, '') || ' ' || COALESCE(BodyKind, '') || ' ' || COALESCE(DecodedBodyPreview, '') || ' ' || COALESCE(BodyDecoderNotes, '') || ' ' || COALESCE(DetectedFileType, '') || ' ' || COALESCE(DetectedExtension, '') AS SearchHitText
                     FROM cache_data
-                    {SearchSql.Where(SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Url", "Host", "ContentType", "CacheType", "Server", "CacheFile", "CacheKey", "BodyPreview", "DetectedFileType", "DetectedExtension"), SearchSql.TimeCondition("Created", "Modified", "LastAccessed"), SearchSql.LabelCondition())}
+                    {SearchSql.Where(SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Url", "Host", "ContentType", "CacheType", "Server", "CacheFile", "CacheKey", "BodyPreview", "BodyKind", "DecodedBodyPreview", "BodyDecoderNotes", "DetectedFileType", "DetectedExtension"), SearchSql.TimeCondition("Created", "Modified", "LastAccessed"), SearchSql.LabelCondition())}
 
                     UNION ALL
                     SELECT id, Artifact_type, Potential_activity, 'session_data' AS Source_table, id AS Source_id, Browser, 'Session' AS Artifact, {lastAccessed} AS Activity_time, {created} AS Secondary_time,
-                           Url, Title, COALESCE(SourceType, SessionFile, '') AS Detail, File, Label, Comment
+                           Url, Title, COALESCE(SourceType, SessionFile, '') AS Detail, File, Label, Comment,
+                           COALESCE(Artifact_type, '') || ' ' || COALESCE(Potential_activity, '') || ' ' || COALESCE(Browser, '') || ' ' || COALESCE(Url, '') || ' ' || COALESCE(Title, '') || ' ' || COALESCE(OriginalUrl, '') || ' ' || COALESCE(Referrer, '') || ' ' || COALESCE(SessionFile, '') || ' ' || COALESCE(SourceType, '') AS SearchHitText
                     FROM session_data
                     {SearchSql.Where(SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Url", "Title", "OriginalUrl", "Referrer", "SessionFile", "SourceType"), SearchSql.TimeCondition("LastAccessed", "Created"), SearchSql.LabelCondition())}
 
                     UNION ALL
                     SELECT id, Artifact_type, Potential_activity, 'extension_data' AS Source_table, id AS Source_id, Browser, 'Extension' AS Artifact, {installTime} AS Activity_time, {lastUpdateTime} AS Secondary_time,
-                           HomepageUrl AS Url, Name AS Title, COALESCE(ExtensionId, Version, Description, '') AS Detail, File, Label, Comment
+                           HomepageUrl AS Url, Name AS Title, COALESCE(ExtensionId, Version, Description, '') AS Detail, File, Label, Comment,
+                           COALESCE(Artifact_type, '') || ' ' || COALESCE(Potential_activity, '') || ' ' || COALESCE(Browser, '') || ' ' || COALESCE(ExtensionId, '') || ' ' || COALESCE(Name, '') || ' ' || COALESCE(Version, '') || ' ' || COALESCE(Description, '') || ' ' || COALESCE(Author, '') || ' ' || COALESCE(HomepageUrl, '') || ' ' || COALESCE(UpdateUrl, '') || ' ' || COALESCE(Permissions, '') || ' ' || COALESCE(HostPermissions, '') || ' ' || COALESCE(ExtensionPath, '') || ' ' || COALESCE(SourceFile, '') AS SearchHitText
                     FROM extension_data
                     {SearchSql.Where(SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "ExtensionId", "Name", "Version", "Description", "Author", "HomepageUrl", "UpdateUrl", "Permissions", "HostPermissions", "ExtensionPath", "SourceFile"), SearchSql.TimeCondition("InstallTime", "LastUpdateTime"), SearchSql.LabelCondition())}
 
                     UNION ALL
                     SELECT id, Artifact_type, Potential_activity, 'saved_logins_data' AS Source_table, id AS Source_id, Browser, 'Saved Login' AS Artifact, {loginLastUsed} AS Activity_time, {loginCreated} AS Secondary_time,
                            COALESCE(Url, Action_url, Signon_realm) AS Url, COALESCE(Username, Username_field, Signon_realm) AS Title,
-                           COALESCE(Credential_artifact_value, Decryption_status, Store, Scheme, Login_guid, '') AS Detail, File, Label, Comment
+                           COALESCE(Decoded_credential_preview, Credential_artifact_value, Credential_kind, Decryption_status, Store, Scheme, Login_guid, '') AS Detail, File, Label, Comment,
+                           COALESCE(Artifact_type, '') || ' ' || COALESCE(Potential_activity, '') || ' ' || COALESCE(Browser, '') || ' ' || COALESCE(Url, '') || ' ' || COALESCE(Action_url, '') || ' ' || COALESCE(Signon_realm, '') || ' ' || COALESCE(Username, '') || ' ' || COALESCE(Username_field, '') || ' ' || COALESCE(Password_field, '') || ' ' || COALESCE(Scheme, '') || ' ' || COALESCE(Decryption_status, '') || ' ' || COALESCE(Credential_artifact_value, '') || ' ' || COALESCE(Credential_kind, '') || ' ' || COALESCE(Decoded_credential_preview, '') || ' ' || COALESCE(Credential_decoder_notes, '') || ' ' || COALESCE(Store, '') || ' ' || COALESCE(Login_guid, '') AS SearchHitText
                     FROM saved_logins_data
-                    {SearchSql.Where(SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Url", "Action_url", "Signon_realm", "Username", "Username_field", "Password_field", "Scheme", "Decryption_status", "Credential_artifact_value", "Store", "Login_guid"), SearchSql.TimeCondition("Created", "Last_used", "Password_changed"), SearchSql.LabelCondition())}
+                    {SearchSql.Where(SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Url", "Action_url", "Signon_realm", "Username", "Username_field", "Password_field", "Scheme", "Decryption_status", "Credential_artifact_value", "Credential_kind", "Decoded_credential_preview", "Credential_decoder_notes", "Store", "Login_guid"), SearchSql.TimeCondition("Created", "Last_used", "Password_changed"), SearchSql.LabelCondition())}
 
                     UNION ALL
                     SELECT id, Artifact_type, Potential_activity, 'local_storage_data' AS Source_table, id AS Source_id, Browser, 'Local Storage' AS Artifact, {localStorageModified} AS Activity_time, {localStorageAccessed} AS Secondary_time,
-                           Origin AS Url, Storage_key AS Title, COALESCE(Host, Source_kind, Parser_notes, '') AS Detail, File, Label, Comment
+                           Origin AS Url, Storage_key AS Title, COALESCE(Host, Source_kind, Parser_notes, '') AS Detail, File, Label, Comment,
+                           COALESCE(Artifact_type, '') || ' ' || COALESCE(Potential_activity, '') || ' ' || COALESCE(Browser, '') || ' ' || COALESCE(Origin, '') || ' ' || COALESCE(Host, '') || ' ' || COALESCE(Storage_key, '') || ' ' || COALESCE(Value_preview, '') || ' ' || COALESCE(Value_kind, '') || ' ' || COALESCE(Decoded_value_preview, '') || ' ' || COALESCE(Decoder_notes, '') || ' ' || COALESCE(Value_sha256, '') || ' ' || COALESCE(Source_kind, '') || ' ' || COALESCE(Source_file, '') || ' ' || COALESCE(Parser_notes, '') AS SearchHitText
                     FROM local_storage_data
-                    {SearchSql.Where(SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Origin", "Host", "Storage_key", "Value_preview", "Value_sha256", "Source_kind", "Source_file", "Parser_notes"), SearchSql.TimeCondition("Created", "Modified", "LastAccessed"), SearchSql.LabelCondition())}
+                    {SearchSql.Where(SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Origin", "Host", "Storage_key", "Value_preview", "Value_kind", "Decoded_value_preview", "Decoder_notes", "Value_sha256", "Source_kind", "Source_file", "Parser_notes"), SearchSql.TimeCondition("Created", "Modified", "LastAccessed"), SearchSql.LabelCondition())}
 
                     UNION ALL
                     SELECT id, Artifact_type, Potential_activity, 'session_storage_data' AS Source_table, id AS Source_id, Browser, 'Session Storage' AS Artifact, {sessionStorageModified} AS Activity_time, {sessionStorageAccessed} AS Secondary_time,
-                           Origin AS Url, Storage_key AS Title, COALESCE(Host, Source_kind, Parser_notes, '') AS Detail, File, Label, Comment
+                           Origin AS Url, Storage_key AS Title, COALESCE(Host, Source_kind, Parser_notes, '') AS Detail, File, Label, Comment,
+                           COALESCE(Artifact_type, '') || ' ' || COALESCE(Potential_activity, '') || ' ' || COALESCE(Browser, '') || ' ' || COALESCE(Origin, '') || ' ' || COALESCE(Host, '') || ' ' || COALESCE(Storage_key, '') || ' ' || COALESCE(Value_preview, '') || ' ' || COALESCE(Value_kind, '') || ' ' || COALESCE(Decoded_value_preview, '') || ' ' || COALESCE(Decoder_notes, '') || ' ' || COALESCE(Value_sha256, '') || ' ' || COALESCE(Source_kind, '') || ' ' || COALESCE(Source_file, '') || ' ' || COALESCE(Parser_notes, '') AS SearchHitText
                     FROM session_storage_data
-                    {SearchSql.Where(SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Origin", "Host", "Storage_key", "Value_preview", "Value_sha256", "Source_kind", "Source_file", "Parser_notes"), SearchSql.TimeCondition("Created", "Modified", "LastAccessed"), SearchSql.LabelCondition())}
+                    {SearchSql.Where(SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Origin", "Host", "Storage_key", "Value_preview", "Value_kind", "Decoded_value_preview", "Decoder_notes", "Value_sha256", "Source_kind", "Source_file", "Parser_notes"), SearchSql.TimeCondition("Created", "Modified", "LastAccessed"), SearchSql.LabelCondition())}
 
                     UNION ALL
                     SELECT id, Artifact_type, Potential_activity, 'indexeddb_data' AS Source_table, id AS Source_id, Browser, 'IndexedDB' AS Artifact, {indexedDbModified} AS Activity_time, {indexedDbAccessed} AS Secondary_time,
-                           Origin AS Url, Storage_key AS Title, COALESCE(Host, Source_kind, Parser_notes, '') AS Detail, File, Label, Comment
+                           Origin AS Url, Storage_key AS Title, COALESCE(Host, Source_kind, Parser_notes, '') AS Detail, File, Label, Comment,
+                           COALESCE(Artifact_type, '') || ' ' || COALESCE(Potential_activity, '') || ' ' || COALESCE(Browser, '') || ' ' || COALESCE(Origin, '') || ' ' || COALESCE(Host, '') || ' ' || COALESCE(Storage_key, '') || ' ' || COALESCE(Value_preview, '') || ' ' || COALESCE(Value_kind, '') || ' ' || COALESCE(Decoded_value_preview, '') || ' ' || COALESCE(Decoder_notes, '') || ' ' || COALESCE(Value_sha256, '') || ' ' || COALESCE(Source_kind, '') || ' ' || COALESCE(Source_file, '') || ' ' || COALESCE(Parser_notes, '') AS SearchHitText
                     FROM indexeddb_data
-                    {SearchSql.Where(SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Origin", "Host", "Storage_key", "Value_preview", "Value_sha256", "Source_kind", "Source_file", "Parser_notes"), SearchSql.TimeCondition("Created", "Modified", "LastAccessed"), SearchSql.LabelCondition())}
+                    {SearchSql.Where(SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Origin", "Host", "Storage_key", "Value_preview", "Value_kind", "Decoded_value_preview", "Decoder_notes", "Value_sha256", "Source_kind", "Source_file", "Parser_notes"), SearchSql.TimeCondition("Created", "Modified", "LastAccessed"), SearchSql.LabelCondition())}
                 )
                 ORDER BY Activity_time DESC;";
         }
@@ -3579,254 +3782,276 @@ namespace Browser_Reviewer
                 lblNavegadorDownloads.Width =
                     flwMain.ClientSize.Width - flwMain.Padding.Horizontal - lblNavegadorDownloads.Margin.Horizontal;
 
-                flwMain.Controls.Add(lblNavegadorDownloads);
+                FlowLayoutPanel flwDownloadTypes = new FlowLayoutPanel
+                {
+                    Name = "flwSubNavegador",
+                    BackColor = Color.Beige,
+                    FlowDirection = FlowDirection.TopDown,
+                    WrapContents = false,
+                    AutoScroll = false,
+                    AutoSize = true,
+                    Height = 200,
+                    Margin = new Padding(0, 4, 0, 4),
+                    Padding = new Padding(4),
+                    Tag = "fullwidth"
+                };
+                flwDownloadTypes.Width =
+                    flwMain.ClientSize.Width - flwMain.Padding.Horizontal - flwDownloadTypes.Margin.Horizontal;
 
+                flwDownloadTypes.SizeChanged += (s, e) =>
+                {
+                    int usable = flwDownloadTypes.ClientSize.Width - flwDownloadTypes.Padding.Horizontal;
+                    foreach (Control c in flwDownloadTypes.Controls)
+                        if ((c.Tag as string) == "fullwidth")
+                            c.Width = Math.Max(0, usable - c.Margin.Horizontal);
+                };
+
+                Label lblAllBrowserDownloads = BuildDownloadTypeLabel(
+                    "All Downloads",
+                    count,
+                    fs,
+                    Resource1.AllHistory.ToBitmap(),
+                    flwDownloadTypes);
+                lblAllBrowserDownloads.Click += (sender, e) =>
+                {
+                    string sqlquery = BuildDownloadsByFileTypeQuery(navegador, null);
+                    Tools.ShowQueryOnDataGridView(sfDataGrid1, Helpers.chromeViewerConnectionString, sqlquery, labelItemCount, Console);
+                    labelStatus.Text = $"Downloads from {navegador}";
+                };
+                flwDownloadTypes.Controls.Add(lblAllBrowserDownloads);
+
+                foreach (var typeEntry in GetDownloadFileTypeCounts(navegador).OrderByDescending(entry => entry.Value).ThenBy(entry => entry.Key))
+                {
+                    Label lblDownloadType = BuildDownloadTypeLabel(
+                        typeEntry.Key,
+                        typeEntry.Value,
+                        fs,
+                        GetDownloadFileTypeIcon(typeEntry.Key),
+                        flwDownloadTypes);
+                    lblDownloadType.Click += (sender, e) =>
+                    {
+                        string sqlquery = BuildDownloadsByFileTypeQuery(navegador, typeEntry.Key);
+                        Tools.ShowQueryOnDataGridView(sfDataGrid1, Helpers.chromeViewerConnectionString, sqlquery, labelItemCount, Console);
+                        labelStatus.Text = $"{typeEntry.Key} downloads from {navegador}";
+                    };
+                    flwDownloadTypes.Controls.Add(lblDownloadType);
+                }
 
                 Helpers.downloadsLabels[navegador] = lblNavegadorDownloads;
 
                 lblNavegadorDownloads.MouseHover += (sender, e) => { lblNavegadorDownloads.BackColor = Color.LightBlue; };
                 lblNavegadorDownloads.MouseLeave += (sender, e) => { lblNavegadorDownloads.BackColor = Color.SteelBlue; };
 
-                lblNavegadorDownloads.Click += (sender, e) =>
-                {
-                    int utcOffset = Helpers.utcOffset;
-                    string sqlquery;
-                    string searchCondition;
-                    string labelCondition = SearchSql.And(SearchSql.LabelCondition());
-                    if (Helpers.searchTermExists)
-                    {
-                        searchCondition = "";
-
-                        if (Helpers.IsFirefoxLikeBrowser(navegador))
-                        {
-                            searchCondition = SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Current_path", "Source_url", "Title", "State");
-                            if (utcOffset == 0)
-                            {
-                                sqlquery = $@"SELECT 
-                                            id,
-                                            Artifact_type,
-                                            Potential_activity,
-                                            Browser,
-                                            Download_id,
-                                            Current_path,
-                                            STRFTIME('%Y-%m-%d %H:%M:%f', End_time) AS End_time,
-                                            STRFTIME('%Y-%m-%d %H:%M:%f', Last_visit_time) AS Last_visit_time,
-                                            Received_bytes,
-                                            Total_bytes,
-                                            Source_url,
-                                            Title,
-                                            State,
-                                            File, Label, Comment
-                                        FROM 
-                                            firefox_downloads
-                                        WHERE Browser = '{navegador}' AND {searchCondition} {Helpers.sqlDownloadtimecondition} {labelCondition};";
-                            }
-                            else
-                            {
-                                string offset = utcOffset > 0 ? $"+{utcOffset} hours" : $"{utcOffset} hours";
-
-                                sqlquery = $@"SELECT 
-                                            id,
-                                            Artifact_type,
-                                            Potential_activity,
-                                            Browser,
-                                            Download_id,
-                                            Current_path,
-                                            STRFTIME('%Y-%m-%d %H:%M:%f', End_time, '{offset}') AS End_time,
-                                            STRFTIME('%Y-%m-%d %H:%M:%f', Last_visit_time, '{offset}') AS Last_visit_time,
-                                            Received_bytes,
-                                            Total_bytes,
-                                            Source_url,
-                                            Title,
-                                            State,
-                                            File, Label, Comment
-                                        FROM 
-                                            firefox_downloads
-                                        WHERE Browser = '{navegador}' AND {searchCondition} {Helpers.sqlDownloadtimecondition} {labelCondition};";
-                            }
-                        }
-                        else
-                        {
-                            searchCondition = SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Current_path", "Target_path", "Url_chain", "State", "Referrer", "Site_url", "Tab_url", "Mime_type");
-                            if (utcOffset == 0)
-                            {
-                                sqlquery = $@"SELECT 
-                                            id,
-                                            Artifact_type,
-                                            Potential_activity,
-                                            Browser,
-                                            Current_path,
-                                            Target_path,
-                                            Url_chain,
-                                            STRFTIME('%Y-%m-%d %H:%M:%f', Start_time) AS Start_time,
-                                            STRFTIME('%Y-%m-%d %H:%M:%f', End_time) AS End_time,
-                                            Received_bytes,
-                                            Total_bytes,
-                                            State,
-                                            Opened,
-                                            Referrer,
-                                            Site_url,
-                                            Tab_url,
-                                            Mime_type,
-                                            File, Label, Comment
-                                        FROM 
-                                            chrome_downloads
-                                        WHERE Browser = '{navegador}' AND {searchCondition} {Helpers.sqlDownloadtimecondition} {labelCondition};";
-                            }
-                            else
-                            {
-                                string offset = utcOffset > 0 ? $"+{utcOffset} hours" : $"{utcOffset} hours";
-
-                                sqlquery = $@"SELECT 
-                                            id,
-                                            Artifact_type,
-                                            Potential_activity,
-                                            Browser,
-                                            Current_path,
-                                            Target_path,
-                                            Url_chain,
-                                            STRFTIME('%Y-%m-%d %H:%M:%f', Start_time, '{offset}') AS Start_time,
-                                            STRFTIME('%Y-%m-%d %H:%M:%f', End_time, '{offset}') AS End_time,
-                                            Received_bytes,
-                                            Total_bytes,
-                                            State,
-                                            Opened,
-                                            Referrer,
-                                            Site_url,
-                                            Tab_url,
-                                            Mime_type,
-                                            File, Label, Comment
-                                        FROM 
-                                            chrome_downloads
-                                        WHERE Browser = '{navegador}' AND {searchCondition} {Helpers.sqlDownloadtimecondition} {labelCondition};";
-                            }
-                        }
-                    }
-                    else
-                    {
-
-                        if (Helpers.searchTimeCondition)
-                        {
-                            Helpers.sqlDownloadtimecondition = $" AND (End_time >= '{Helpers.sd}' AND End_time <= '{Helpers.ed}')";
-
-                        }
-
-                        if (Helpers.IsFirefoxLikeBrowser(navegador))
-                        {
-                            if (utcOffset == 0)
-                            {
-                                sqlquery = $@"SELECT 
-                                            id,
-                                            Artifact_type,
-                                            Potential_activity,
-                                            Browser,
-                                            Download_id,
-                                            Current_path,
-                                            STRFTIME('%Y-%m-%d %H:%M:%f', End_time) AS End_time,
-                                            STRFTIME('%Y-%m-%d %H:%M:%f', Last_visit_time) AS Last_visit_time,
-                                            Received_bytes,
-                                            Total_bytes,
-                                            Source_url,
-                                            Title,
-                                            State,
-                                            File, Label, Comment
-                                        FROM 
-                                            firefox_downloads
-                                        WHERE Browser = '{navegador}' {Helpers.sqlDownloadtimecondition} {labelCondition};";
-                            }
-                            else
-                            {
-                                string offset = utcOffset > 0 ? $"+{utcOffset} hours" : $"{utcOffset} hours";
-
-                                sqlquery = $@"SELECT 
-                                            id,
-                                            Artifact_type,
-                                            Potential_activity,
-                                            Browser,
-                                            Download_id,
-                                            Current_path,
-                                            STRFTIME('%Y-%m-%d %H:%M:%f', End_time, '{offset}') AS End_time,
-                                            STRFTIME('%Y-%m-%d %H:%M:%f', Last_visit_time, '{offset}') AS Last_visit_time,
-                                            Received_bytes,
-                                            Total_bytes,
-                                            Source_url,
-                                            Title,
-                                            State,
-                                            File, Label, Comment
-                                        FROM 
-                                            firefox_downloads
-                                        WHERE Browser = '{navegador}' {Helpers.sqlDownloadtimecondition} {labelCondition};";
-                            }
-                        }
-                        else
-                        {
-                            if (utcOffset == 0)
-                            {
-                                sqlquery = $@"SELECT 
-                                            id,
-                                            Artifact_type,
-                                            Potential_activity,
-                                            Browser,
-                                            Current_path,
-                                            Target_path,
-                                            Url_chain,
-                                            STRFTIME('%Y-%m-%d %H:%M:%f', Start_time) AS Start_time,
-                                            STRFTIME('%Y-%m-%d %H:%M:%f', End_time) AS End_time,
-                                            Received_bytes,
-                                            Total_bytes,
-                                            State,
-                                            Opened,
-                                            Referrer,
-                                            Site_url,
-                                            Tab_url,
-                                            Mime_type,
-                                            File, Label, Comment
-                                        FROM 
-                                            chrome_downloads
-                                        WHERE Browser = '{navegador}' {Helpers.sqlDownloadtimecondition} {labelCondition};";
-                            }
-                            else
-                            {
-                                string offset = utcOffset > 0 ? $"+{utcOffset} hours" : $"{utcOffset} hours";
-
-                                sqlquery = $@"SELECT 
-                                            id,
-                                            Artifact_type,
-                                            Potential_activity,
-                                            Browser,
-                                            Current_path,
-                                            Target_path,
-                                            Url_chain,
-                                            STRFTIME('%Y-%m-%d %H:%M:%f', Start_time, '{offset}') AS Start_time,
-                                            STRFTIME('%Y-%m-%d %H:%M:%f', End_time, '{offset}') AS End_time,
-                                            Received_bytes,
-                                            Total_bytes,
-                                            State,
-                                            Opened,
-                                            Referrer,
-                                            Site_url,
-                                            Tab_url,
-                                            Mime_type,
-                                            File, Label, Comment
-                                        FROM 
-                                            chrome_downloads
-                                        WHERE Browser = '{navegador}' {Helpers.sqlDownloadtimecondition} {labelCondition};";
-                            }
-                        }
-                    }
-
-
-
-
-
-                    Tools.ShowQueryOnDataGridView(sfDataGrid1, Helpers.chromeViewerConnectionString, sqlquery, labelItemCount, Console);
-                    labelStatus.Text = $"Downloads from {navegador}";
-
-
-                };
-
                 flwMain.Controls.Add(lblNavegadorDownloads);
+                flwMain.Controls.Add(flwDownloadTypes);
+
+                flwDownloadTypes.Visible = false;
+                lblNavegadorDownloads.Click += (sender, e) => flwDownloadTypes.Visible = !flwDownloadTypes.Visible;
             }
+        }
+
+        private Label BuildDownloadTypeLabel(string fileType, int count, Font font, Image icon, FlowLayoutPanel parent)
+        {
+            Label label = new Label
+            {
+                BackColor = Color.Transparent,
+                Font = font,
+                ForeColor = Color.Black,
+                Image = icon,
+                ImageAlign = ContentAlignment.MiddleLeft,
+                Padding = new Padding(32, 1, 0, 1),
+                Text = $"{fileType} ({count} hits)",
+                TextAlign = ContentAlignment.MiddleCenter,
+                AutoSize = false,
+                Height = Math.Max(icon.Height + 5, font.Height + 10),
+                Margin = new Padding(3, 1, 3, 1),
+                Tag = "fullwidth"
+            };
+
+            label.Width = parent.ClientSize.Width - parent.Padding.Horizontal - label.Margin.Horizontal;
+            label.MouseHover += (s, e) => label.BackColor = Color.LightBlue;
+            label.MouseLeave += (s, e) => label.BackColor = Color.Transparent;
+            return label;
+        }
+
+        private Image GetDownloadFileTypeIcon(string fileType)
+        {
+            return fileType switch
+            {
+                "Images" => GetImageFileIcon(),
+                "Videos" => GetVideoFileIcon(),
+                "Audio" => GetAudioFileIcon(),
+                "Documents" => Resource1.OnlineOfficeSuite.ToBitmap(),
+                "Archives" => Resource1.FileEncryptionTools.ToBitmap(),
+                "Executables" => Resource1.HackingCybersecuritySites.ToBitmap(),
+                "Web files" => Resource1.CodeHosting.ToBitmap(),
+                _ => Resource1.file_icon
+            };
+        }
+
+        private static Image GetImageFileIcon()
+        {
+            return Resource1.image_file_32;
+        }
+
+        private static Image GetAudioFileIcon()
+        {
+            return Resource1.audio_file_32;
+        }
+
+        private static Image GetVideoFileIcon()
+        {
+            return Resource1.video_file_32;
+        }
+
+        private static bool IsImageFileCategory(string value)
+        {
+            string normalized = (value ?? string.Empty)
+                .Trim()
+                .TrimStart('.')
+                .ToLowerInvariant();
+
+            return normalized.Contains("image") ||
+                   normalized is "jpg" or "jpeg" or "jfif" or "png" or "gif" or "webp" or
+                   "bmp" or "svg" or "tif" or "tiff" or "ico" or "heic" or "heif" or "avif";
+        }
+
+        private static bool IsAudioFileCategory(string value)
+        {
+            string normalized = (value ?? string.Empty)
+                .Trim()
+                .TrimStart('.')
+                .ToLowerInvariant();
+
+            return normalized.Contains("audio") ||
+                   normalized is "mp3" or "wav" or "m4a" or "aac" or "flac" or "ogg" or
+                   "oga" or "opus" or "wma" or "aiff" or "aif" or "mid" or "midi" or "amr";
+        }
+
+        private static bool IsVideoFileCategory(string value)
+        {
+            string normalized = (value ?? string.Empty)
+                .Trim()
+                .TrimStart('.')
+                .ToLowerInvariant();
+
+            return normalized.Contains("video") ||
+                   normalized.Contains("quicktime") ||
+                   normalized is "mp4" or "m4v" or "mov" or "avi" or "mkv" or "webm" or
+                   "wmv" or "flv" or "mpg" or "mpeg" or "3gp" or "3g2" or "ogv" or "ts";
+        }
+
+        private Dictionary<string, int> GetDownloadFileTypeCounts(string browserName)
+        {
+            Dictionary<string, int> counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            string browser = EscapeSqlLiteral(browserName);
+            string chromeFilter = CurrentAndFilter(
+                SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Current_path", "Target_path", "Url_chain", "State", "Referrer", "Site_url", "Tab_url", "Mime_type"),
+                SearchSql.TimeCondition("Start_time", "End_time"));
+            string firefoxFilter = CurrentAndFilter(
+                SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Current_path", "Source_url", "Title", "State"),
+                SearchSql.TimeCondition("End_time", "Last_visit_time"));
+
+            string chromeType = DownloadFileTypeExpression("lower(coalesce(nullif(Target_path, ''), nullif(Current_path, ''), nullif(Url_chain, ''), ''))", "lower(coalesce(Mime_type, ''))");
+            string firefoxType = DownloadFileTypeExpression("lower(coalesce(nullif(Current_path, ''), nullif(Source_url, ''), nullif(Title, ''), ''))", "''");
+
+            string query = $@"
+                SELECT File_type, COUNT(*) AS Count
+                FROM (
+                    SELECT {chromeType} AS File_type
+                    FROM chrome_downloads
+                    WHERE Browser = '{browser}' {chromeFilter}
+                    UNION ALL
+                    SELECT {firefoxType} AS File_type
+                    FROM firefox_downloads
+                    WHERE Browser = '{browser}' {firefoxFilter}
+                )
+                GROUP BY File_type;";
+
+            using SQLiteConnection connection = new SQLiteConnection(Helpers.chromeViewerConnectionString);
+            connection.Open();
+            using SQLiteCommand command = new SQLiteCommand(query, connection);
+            SearchSql.AddParameters(command);
+            using SQLiteDataReader reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                string fileType = reader.IsDBNull(0) ? "Other" : reader.GetString(0);
+                int count = reader.GetInt32(1);
+                counts[fileType] = count;
+            }
+
+            return counts;
+        }
+
+        private string BuildDownloadsByFileTypeQuery(string browserName, string? fileType)
+        {
+            int utcOffset = Helpers.utcOffset;
+            string browser = EscapeSqlLiteral(browserName);
+            string? type = string.IsNullOrWhiteSpace(fileType) ? null : EscapeSqlLiteral(fileType);
+            string offset = utcOffset == 0 ? string.Empty : (utcOffset > 0 ? $"+{utcOffset} hours" : $"{utcOffset} hours");
+            string chromeStart = utcOffset == 0
+                ? "STRFTIME('%Y-%m-%d %H:%M:%f', Start_time)"
+                : $"STRFTIME('%Y-%m-%d %H:%M:%f', Start_time, '{offset}')";
+            string chromeEnd = utcOffset == 0
+                ? "STRFTIME('%Y-%m-%d %H:%M:%f', End_time)"
+                : $"STRFTIME('%Y-%m-%d %H:%M:%f', End_time, '{offset}')";
+            string firefoxEnd = utcOffset == 0
+                ? "STRFTIME('%Y-%m-%d %H:%M:%f', End_time)"
+                : $"STRFTIME('%Y-%m-%d %H:%M:%f', End_time, '{offset}')";
+            string firefoxLastVisit = utcOffset == 0
+                ? "STRFTIME('%Y-%m-%d %H:%M:%f', Last_visit_time)"
+                : $"STRFTIME('%Y-%m-%d %H:%M:%f', Last_visit_time, '{offset}')";
+
+            string chromeFilter = CurrentAndFilter(
+                SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Current_path", "Target_path", "Url_chain", "State", "Referrer", "Site_url", "Tab_url", "Mime_type"),
+                SearchSql.TimeCondition("Start_time", "End_time"));
+            string firefoxFilter = CurrentAndFilter(
+                SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Current_path", "Source_url", "Title", "State"),
+                SearchSql.TimeCondition("End_time", "Last_visit_time"));
+
+            string chromeType = DownloadFileTypeExpression("lower(coalesce(nullif(Target_path, ''), nullif(Current_path, ''), nullif(Url_chain, ''), ''))", "lower(coalesce(Mime_type, ''))");
+            string firefoxType = DownloadFileTypeExpression("lower(coalesce(nullif(Current_path, ''), nullif(Source_url, ''), nullif(Title, ''), ''))", "''");
+            string chromeTypeFilter = type == null ? string.Empty : $" AND {chromeType} = '{type}'";
+            string firefoxTypeFilter = type == null ? string.Empty : $" AND {firefoxType} = '{type}'";
+
+            return $@"
+                SELECT id, Artifact_type, Potential_activity, Browser, {chromeType} AS File_type,
+                       Current_path, Target_path, Url_chain,
+                       {chromeStart} AS Start_time,
+                       {chromeEnd} AS End_time,
+                       Received_bytes, Total_bytes, State, Opened, Referrer, Site_url, Tab_url, Mime_type,
+                       File, Label, Comment
+                FROM chrome_downloads
+                WHERE Browser = '{browser}' {chromeFilter} {chromeTypeFilter}
+                UNION ALL
+                SELECT id, Artifact_type, Potential_activity, Browser, {firefoxType} AS File_type,
+                       Current_path, NULL AS Target_path, Source_url AS Url_chain,
+                       NULL AS Start_time,
+                       {firefoxEnd} AS End_time,
+                       Received_bytes, Total_bytes, State, NULL AS Opened, NULL AS Referrer, NULL AS Site_url, NULL AS Tab_url, NULL AS Mime_type,
+                       File, Label, Comment
+                FROM firefox_downloads
+                WHERE Browser = '{browser}' {firefoxFilter} {firefoxTypeFilter};";
+        }
+
+        private static string DownloadFileTypeExpression(string pathExpression, string mimeExpression)
+        {
+            return $@"CASE
+                WHEN {mimeExpression} LIKE 'image/%' OR {pathExpression} LIKE '%.jpg' OR {pathExpression} LIKE '%.jpeg' OR {pathExpression} LIKE '%.jfif' OR {pathExpression} LIKE '%.png' OR {pathExpression} LIKE '%.gif' OR {pathExpression} LIKE '%.webp' OR {pathExpression} LIKE '%.bmp' OR {pathExpression} LIKE '%.svg' OR {pathExpression} LIKE '%.tif' OR {pathExpression} LIKE '%.tiff' OR {pathExpression} LIKE '%.ico' OR {pathExpression} LIKE '%.heic' OR {pathExpression} LIKE '%.heif' OR {pathExpression} LIKE '%.avif' THEN 'Images'
+                WHEN {mimeExpression} LIKE 'video/%' OR {pathExpression} LIKE '%.mp4' OR {pathExpression} LIKE '%.m4v' OR {pathExpression} LIKE '%.mov' OR {pathExpression} LIKE '%.avi' OR {pathExpression} LIKE '%.mkv' OR {pathExpression} LIKE '%.webm' OR {pathExpression} LIKE '%.wmv' OR {pathExpression} LIKE '%.flv' OR {pathExpression} LIKE '%.mpg' OR {pathExpression} LIKE '%.mpeg' OR {pathExpression} LIKE '%.3gp' OR {pathExpression} LIKE '%.3g2' OR {pathExpression} LIKE '%.ogv' OR {pathExpression} LIKE '%.ts' THEN 'Videos'
+                WHEN {mimeExpression} LIKE 'audio/%' OR {pathExpression} LIKE '%.mp3' OR {pathExpression} LIKE '%.wav' OR {pathExpression} LIKE '%.m4a' OR {pathExpression} LIKE '%.aac' OR {pathExpression} LIKE '%.flac' OR {pathExpression} LIKE '%.ogg' OR {pathExpression} LIKE '%.oga' OR {pathExpression} LIKE '%.opus' OR {pathExpression} LIKE '%.wma' OR {pathExpression} LIKE '%.aiff' OR {pathExpression} LIKE '%.aif' OR {pathExpression} LIKE '%.mid' OR {pathExpression} LIKE '%.midi' OR {pathExpression} LIKE '%.amr' THEN 'Audio'
+                WHEN {mimeExpression} LIKE '%pdf%' OR {pathExpression} LIKE '%.pdf' OR {pathExpression} LIKE '%.doc' OR {pathExpression} LIKE '%.docx' OR {pathExpression} LIKE '%.xls' OR {pathExpression} LIKE '%.xlsx' OR {pathExpression} LIKE '%.ppt' OR {pathExpression} LIKE '%.pptx' OR {pathExpression} LIKE '%.odt' OR {pathExpression} LIKE '%.rtf' OR {pathExpression} LIKE '%.txt' OR {pathExpression} LIKE '%.csv' THEN 'Documents'
+                WHEN {mimeExpression} LIKE '%zip%' OR {pathExpression} LIKE '%.zip' OR {pathExpression} LIKE '%.rar' OR {pathExpression} LIKE '%.7z' OR {pathExpression} LIKE '%.tar' OR {pathExpression} LIKE '%.gz' OR {pathExpression} LIKE '%.bz2' THEN 'Archives'
+                WHEN {pathExpression} LIKE '%.exe' OR {pathExpression} LIKE '%.msi' OR {pathExpression} LIKE '%.dll' OR {pathExpression} LIKE '%.bat' OR {pathExpression} LIKE '%.cmd' OR {pathExpression} LIKE '%.ps1' OR {pathExpression} LIKE '%.scr' THEN 'Executables'
+                WHEN {mimeExpression} LIKE '%json%' OR {mimeExpression} LIKE '%html%' OR {pathExpression} LIKE '%.html' OR {pathExpression} LIKE '%.htm' OR {pathExpression} LIKE '%.json' OR {pathExpression} LIKE '%.xml' OR {pathExpression} LIKE '%.js' OR {pathExpression} LIKE '%.css' THEN 'Web files'
+                WHEN {pathExpression} LIKE '%.db' OR {pathExpression} LIKE '%.sqlite' OR {pathExpression} LIKE '%.sqlite3' THEN 'Databases'
+                ELSE 'Other'
+            END";
+        }
+
+        private static string EscapeSqlLiteral(string value)
+        {
+            return (value ?? string.Empty).Replace("'", "''");
         }
 
 
@@ -3982,6 +4207,61 @@ namespace Browser_Reviewer
                 lblNavegadorBookmarks.Width =
                     flwMain.ClientSize.Width - flwMain.Padding.Horizontal - lblNavegadorBookmarks.Margin.Horizontal;
 
+                FlowLayoutPanel flwBookmarkCategories = new FlowLayoutPanel
+                {
+                    Name = "flwSubNavegador",
+                    BackColor = Color.Beige,
+                    FlowDirection = FlowDirection.TopDown,
+                    WrapContents = false,
+                    AutoScroll = false,
+                    AutoSize = true,
+                    Height = 200,
+                    Margin = new Padding(0, 4, 0, 4),
+                    Padding = new Padding(4),
+                    Tag = "fullwidth"
+                };
+                flwBookmarkCategories.Width =
+                    flwMain.ClientSize.Width - flwMain.Padding.Horizontal - flwBookmarkCategories.Margin.Horizontal;
+
+                flwBookmarkCategories.SizeChanged += (s, e) =>
+                {
+                    int usable = flwBookmarkCategories.ClientSize.Width - flwBookmarkCategories.Padding.Horizontal;
+                    foreach (Control c in flwBookmarkCategories.Controls)
+                        if ((c.Tag as string) == "fullwidth")
+                            c.Width = Math.Max(0, usable - c.Margin.Horizontal);
+                };
+
+                Label lblAllBrowserBookmarks = BuildDownloadTypeLabel(
+                    "All Bookmarks",
+                    count,
+                    fs,
+                    Resource1.AllHistory.ToBitmap(),
+                    flwBookmarkCategories);
+                lblAllBrowserBookmarks.Click += (sender, e) =>
+                {
+                    string sqlquery = BuildBookmarksByCategoryQuery(navegador, null);
+                    Tools.ShowQueryOnDataGridView(sfDataGrid1, Helpers.chromeViewerConnectionString, sqlquery, labelItemCount, Console);
+                    labelStatus.Text = $"Bookmarks from {navegador}";
+                };
+                flwBookmarkCategories.Controls.Add(lblAllBrowserBookmarks);
+
+                foreach (var categoryEntry in GetBookmarkCategoryCounts(navegador).OrderBy(entry => entry.Key))
+                {
+                    Label lblBookmarkCategory = BuildDownloadTypeLabel(
+                        categoryEntry.Key,
+                        categoryEntry.Value,
+                        fs,
+                        GetHistoryCategoryIcon(categoryEntry.Key),
+                        flwBookmarkCategories);
+                    lblBookmarkCategory.Click += (sender, e) =>
+                    {
+                        string sqlquery = BuildBookmarksByCategoryQuery(navegador, categoryEntry.Key);
+                        Tools.ShowQueryOnDataGridView(sfDataGrid1, Helpers.chromeViewerConnectionString, sqlquery, labelItemCount, Console);
+                        labelStatus.Text = $"{categoryEntry.Key} bookmarks from {navegador}";
+                    };
+                    flwBookmarkCategories.Controls.Add(lblBookmarkCategory);
+                }
+
                 Helpers.bookmarksLabels[navegador] = lblNavegadorBookmarks;
 
                 lblNavegadorBookmarks.MouseHover += (sender, e) => { lblNavegadorBookmarks.BackColor = Color.LightBlue; };
@@ -3989,98 +4269,13 @@ namespace Browser_Reviewer
 
                 lblNavegadorBookmarks.Click += (sender, e) =>
                 {
-                    int utcOffset = Helpers.utcOffset;
-                    string sqlquery;
-                    string labelCondition = SearchSql.And(SearchSql.LabelCondition());
-
-                    if (Helpers.searchTermExists)
-                    {
-                        string searchCondition = SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Type", "Title", "URL", "Parent_name");
-
-                        if (Helpers.IsFirefoxLikeBrowser(navegador))
-                        {
-                            sqlquery = utcOffset == 0
-                                ? $@"SELECT 
-                                    id, Artifact_type, Potential_activity, Browser, Type, Title, URL, 
-                                    STRFTIME('%Y-%m-%d %H:%M:%f', DateAdded) AS DateAdded,
-                                    STRFTIME('%Y-%m-%d %H:%M:%f', LastModified) AS LastModified,
-                                    Parent_name, File, Label, Comment
-                                    FROM bookmarks_Firefox WHERE Browser = '{navegador}' AND {searchCondition} {Helpers.sqlBookmarkstimecondition} {labelCondition};"
-                                                    : $@"SELECT 
-                                    id, Artifact_type, Potential_activity, Browser, Type, Title, URL, 
-                                    STRFTIME('%Y-%m-%d %H:%M:%f', DateAdded, '{utcOffset} hours') AS DateAdded,
-                                    STRFTIME('%Y-%m-%d %H:%M:%f', LastModified, '{utcOffset} hours') AS LastModified,
-                                    Parent_name, File, Label, Comment
-                                    FROM bookmarks_Firefox WHERE Browser = '{navegador}' AND {searchCondition} {Helpers.sqlBookmarkstimecondition} {labelCondition};";
-                        }
-                        else
-                        {
-                            sqlquery = utcOffset == 0
-                                ? $@"SELECT 
-                                    id, Artifact_type, Potential_activity, Browser, Type, Title, URL, 
-                                    STRFTIME('%Y-%m-%d %H:%M:%f', DateAdded) AS DateAdded,
-                                    STRFTIME('%Y-%m-%d %H:%M:%f', LastModified) AS LastModified,
-                                    Parent_name, File, Label, Comment
-                                    FROM bookmarks_Chrome WHERE Browser = '{navegador}' AND {searchCondition} {Helpers.sqlBookmarkstimecondition} {labelCondition};"
-                                                    : $@"SELECT 
-                                    id, Artifact_type, Potential_activity, Browser, Type, Title, URL, 
-                                    STRFTIME('%Y-%m-%d %H:%M:%f', DateAdded, '{utcOffset} hours') AS DateAdded,
-                                    STRFTIME('%Y-%m-%d %H:%M:%f', LastModified, '{utcOffset} hours') AS LastModified,
-                                    Parent_name, File, Label, Comment
-                                    FROM bookmarks_Chrome WHERE Browser = '{navegador}' AND {searchCondition} {Helpers.sqlBookmarkstimecondition} {labelCondition};";
-                        }
-                    }
-                    else
-                    {
-                        if (Helpers.searchTimeCondition)
-                        {
-                            Helpers.sqlBookmarkstimecondition = $" AND ((DateAdded >= '{Helpers.sd}' AND DateAdded <= '{Helpers.ed}') OR (LastModified >= '{Helpers.sd}' AND LastModified <= '{Helpers.ed}'))";
-                        }
-                        if (Helpers.IsFirefoxLikeBrowser(navegador))
-                        {
-                            sqlquery = utcOffset == 0
-                                ? $@"SELECT 
-                                    id, Artifact_type, Potential_activity, Browser, Type, Title, URL, 
-                                    STRFTIME('%Y-%m-%d %H:%M:%f', DateAdded) AS DateAdded,
-                                    STRFTIME('%Y-%m-%d %H:%M:%f', LastModified) AS LastModified,
-                                    Parent_name, File, Label, Comment
-                                FROM bookmarks_Firefox WHERE Browser = '{navegador}' {Helpers.sqlBookmarkstimecondition} {labelCondition};"
-                                                            : $@"SELECT 
-                                    id, Artifact_type, Potential_activity, Browser, Type, Title, URL, 
-                                    STRFTIME('%Y-%m-%d %H:%M:%f', DateAdded, '{utcOffset} hours') AS DateAdded,
-                                    STRFTIME('%Y-%m-%d %H:%M:%f', LastModified, '{utcOffset} hours') AS LastModified,
-                                    Parent_name, File, Label, Comment
-                                FROM bookmarks_Firefox WHERE Browser = '{navegador}' {Helpers.sqlBookmarkstimecondition} {labelCondition};";
-                        }
-                        else
-                        {
-                            sqlquery = utcOffset == 0
-                                ? $@"SELECT 
-                                    id, Artifact_type, Potential_activity, Browser, Type, Title, URL, 
-                                    STRFTIME('%Y-%m-%d %H:%M:%f', DateAdded) AS DateAdded,
-                                    STRFTIME('%Y-%m-%d %H:%M:%f', LastModified) AS LastModified,
-                                    Parent_name, File, Label, Comment
-                                FROM bookmarks_Chrome WHERE Browser = '{navegador}' {Helpers.sqlBookmarkstimecondition} {labelCondition};"
-                                                            : $@"SELECT 
-                                    id, Artifact_type, Potential_activity, Browser, Type, Title, URL, 
-                                    STRFTIME('%Y-%m-%d %H:%M:%f', DateAdded, '{utcOffset} hours') AS DateAdded,
-                                    STRFTIME('%Y-%m-%d %H:%M:%f', LastModified, '{utcOffset} hours') AS LastModified,
-                                    Parent_name, File, Label, Comment
-                                FROM bookmarks_Chrome WHERE Browser = '{navegador}' {Helpers.sqlBookmarkstimecondition} {labelCondition};";
-                        }
-                    }
-
-
-
-
-
-
-                    Tools.ShowQueryOnDataGridView(sfDataGrid1, Helpers.chromeViewerConnectionString, sqlquery, labelItemCount, Console);
-                    labelStatus.Text = $"Bookmarks from {navegador}";
-
+                    flwBookmarkCategories.Visible = !flwBookmarkCategories.Visible;
                 };
 
                 flwMain.Controls.Add(lblNavegadorBookmarks);
+                flwMain.Controls.Add(flwBookmarkCategories);
+
+                flwBookmarkCategories.Visible = false;
             }
         }
 
@@ -4202,118 +4397,195 @@ namespace Browser_Reviewer
                 lblNavegadorAutofill.Width =
                     flwMain.ClientSize.Width - flwMain.Padding.Horizontal - lblNavegadorAutofill.Margin.Horizontal;
 
+                FlowLayoutPanel flwAutofillCategories = new FlowLayoutPanel
+                {
+                    Name = "flwSubNavegador",
+                    BackColor = Color.Beige,
+                    FlowDirection = FlowDirection.TopDown,
+                    WrapContents = false,
+                    AutoScroll = false,
+                    AutoSize = true,
+                    Height = 200,
+                    Margin = new Padding(0, 4, 0, 4),
+                    Padding = new Padding(4),
+                    Tag = "fullwidth"
+                };
+                flwAutofillCategories.Width =
+                    flwMain.ClientSize.Width - flwMain.Padding.Horizontal - flwAutofillCategories.Margin.Horizontal;
+
+                flwAutofillCategories.SizeChanged += (s, e) =>
+                {
+                    int usable = flwAutofillCategories.ClientSize.Width - flwAutofillCategories.Padding.Horizontal;
+                    foreach (Control c in flwAutofillCategories.Controls)
+                        if ((c.Tag as string) == "fullwidth")
+                            c.Width = Math.Max(0, usable - c.Margin.Horizontal);
+                };
+
+                Label lblAllBrowserAutofill = BuildDownloadTypeLabel(
+                    "All Autofill",
+                    count,
+                    fs,
+                    Resource1.AllHistory.ToBitmap(),
+                    flwAutofillCategories);
+                lblAllBrowserAutofill.Click += (sender, e) =>
+                {
+                    string sqlquery = BuildAutofillByFieldCategoryQuery(navegador, null);
+                    Tools.ShowQueryOnDataGridView(sfDataGrid1, Helpers.chromeViewerConnectionString, sqlquery, labelItemCount, Console);
+                    labelStatus.Text = $"Autofill data from {navegador}";
+                };
+                flwAutofillCategories.Controls.Add(lblAllBrowserAutofill);
+
+                foreach (var categoryEntry in GetAutofillFieldCategoryCounts(navegador).OrderBy(entry => entry.Key))
+                {
+                    Label lblAutofillCategory = BuildDownloadTypeLabel(
+                        categoryEntry.Key,
+                        categoryEntry.Value,
+                        fs,
+                        GetAutofillFieldCategoryIcon(categoryEntry.Key),
+                        flwAutofillCategories);
+                    lblAutofillCategory.Click += (sender, e) =>
+                    {
+                        string sqlquery = BuildAutofillByFieldCategoryQuery(navegador, categoryEntry.Key);
+                        Tools.ShowQueryOnDataGridView(sfDataGrid1, Helpers.chromeViewerConnectionString, sqlquery, labelItemCount, Console);
+                        labelStatus.Text = $"{categoryEntry.Key} autofill data from {navegador}";
+                    };
+                    flwAutofillCategories.Controls.Add(lblAutofillCategory);
+                }
+
                 lblNavegadorAutofill.MouseHover += (sender, e) => { lblNavegadorAutofill.BackColor = Color.LightBlue; };
                 lblNavegadorAutofill.MouseLeave += (sender, e) => { lblNavegadorAutofill.BackColor = Color.SteelBlue; };
 
                 lblNavegadorAutofill.Click += (sender, e) =>
                 {
-                    int utcOffset = Helpers.utcOffset;
-                    string sqlquery;
-                    string labelCondition = SearchSql.And(SearchSql.LabelCondition());
-
-                    if (Helpers.searchTermExists)
-                    {
-                        string searchCondition = SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "FieldName", "Value");
-
-
-                        if (utcOffset == 0)
-                        {
-                            sqlquery = $@"SELECT id,
-                                                Artifact_type,
-                                                Potential_activity,
-                                                Browser,
-                                                FieldName,
-                                                Value,
-                                                COALESCE(TimesUsed, Count) AS TimesUsed,
-                                                STRFTIME('%Y-%m-%d %H:%M:%f', FirstUsed) AS FirstUsed,
-                                                STRFTIME('%Y-%m-%d %H:%M:%f', LastUsed) AS LastUsed,
-                                                File, Label, Comment
-                                            FROM 
-                                                autofill_data
-                                            WHERE Browser = '{navegador}' AND {searchCondition} {Helpers.sqlAutofilltimecondition} {labelCondition};";
-                        }
-                        else
-                        {
-                            string offset = utcOffset > 0 ? $"+{utcOffset} hours" : $"{utcOffset} hours";
-
-                            if (Helpers.searchTimeCondition)
-                            {
-                                Helpers.sqlAutofilltimecondition = $" AND ((FirstUsed >= '{Helpers.sd}' AND FirstUsed <= '{Helpers.ed}') OR (LastUsed >= '{Helpers.sd}' AND LastUsed <= '{Helpers.ed}'))";
-                            }
-
-                            sqlquery = $@"SELECT id,
-                                                Artifact_type,
-                                                Potential_activity,
-                                                Browser,
-                                                FieldName,
-                                                Value,
-                                                COALESCE(TimesUsed, Count) AS TimesUsed,
-                                                STRFTIME('%Y-%m-%d %H:%M:%f', FirstUsed, '{offset}') AS FirstUsed,
-                                                STRFTIME('%Y-%m-%d %H:%M:%f', LastUsed, '{offset}') AS LastUsed,
-                                                File, Label, Comment
-                                            FROM 
-                                                autofill_data
-                                            WHERE Browser = '{navegador}' AND {searchCondition} {Helpers.sqlAutofilltimecondition} {labelCondition};";
-                        }
-
-                    }
-                    else
-                    {
-                        if (utcOffset == 0)
-                        {
-                            if (Helpers.searchTimeCondition)
-                            {
-                                Helpers.sqlAutofilltimecondition = $" AND ((FirstUsed >= '{Helpers.sd}' AND FirstUsed <= '{Helpers.ed}') OR (LastUsed >= '{Helpers.sd}' AND LastUsed <= '{Helpers.ed}'))";
-                            }
-                            sqlquery = $@"SELECT id,
-                                                Artifact_type,
-                                                Potential_activity,
-                                                Browser,
-                                                FieldName,
-                                                Value,
-                                                COALESCE(TimesUsed, Count) AS TimesUsed,
-                                                STRFTIME('%Y-%m-%d %H:%M:%f', FirstUsed) AS FirstUsed,
-                                                STRFTIME('%Y-%m-%d %H:%M:%f', LastUsed) AS LastUsed,
-                                                File, Label, Comment
-                                            FROM 
-                                                autofill_data
-                                            WHERE Browser = '{navegador}' {Helpers.sqlAutofilltimecondition} {labelCondition};";
-                        }
-                        else
-                        {
-                            string offset = utcOffset > 0 ? $"+{utcOffset} hours" : $"{utcOffset} hours";
-
-                            if (Helpers.searchTimeCondition)
-                            {
-                                Helpers.sqlAutofilltimecondition = $" AND ((FirstUsed >= '{Helpers.sd}' AND FirstUsed <= '{Helpers.ed}') OR (LastUsed >= '{Helpers.sd}' AND LastUsed <= '{Helpers.ed}'))";
-                            }
-
-                            sqlquery = $@"SELECT id,
-                                                Artifact_type,
-                                                Potential_activity,
-                                                Browser,
-                                                FieldName,
-                                                Value,
-                                                COALESCE(TimesUsed, Count) AS TimesUsed,
-                                                STRFTIME('%Y-%m-%d %H:%M:%f', FirstUsed, '{offset}') AS FirstUsed,
-                                                STRFTIME('%Y-%m-%d %H:%M:%f', LastUsed, '{offset}') AS LastUsed,
-                                                File, Label, Comment
-                                            FROM 
-                                                autofill_data
-                                            WHERE Browser = '{navegador}' {Helpers.sqlAutofilltimecondition} {labelCondition};";
-                        }
-                    }
-
-
-
-                    Tools.ShowQueryOnDataGridView(sfDataGrid1, Helpers.chromeViewerConnectionString, sqlquery, labelItemCount, Console);
-                    labelStatus.Text = $"Autofill data from {navegador}";
+                    flwAutofillCategories.Visible = !flwAutofillCategories.Visible;
                 };
 
                 flwMain.Controls.Add(lblNavegadorAutofill);
+                flwMain.Controls.Add(flwAutofillCategories);
+
+                flwAutofillCategories.Visible = false;
             }
         }
 
+        private Dictionary<string, int> GetAutofillFieldCategoryCounts(string browserName)
+        {
+            Dictionary<string, int> counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var row in GetAutofillFacetRows(browserName))
+            {
+                string category = ClassifyAutofillFieldName(row.FieldName);
+                counts[category] = counts.TryGetValue(category, out int count) ? count + 1 : 1;
+            }
+
+            return counts;
+        }
+
+        private string BuildAutofillByFieldCategoryQuery(string browserName, string? category)
+        {
+            int utcOffset = Helpers.utcOffset;
+            string offset = utcOffset == 0 ? string.Empty : (utcOffset > 0 ? $"+{utcOffset} hours" : $"{utcOffset} hours");
+            string firstUsedExpr = utcOffset == 0
+                ? "STRFTIME('%Y-%m-%d %H:%M:%f', FirstUsed)"
+                : $"STRFTIME('%Y-%m-%d %H:%M:%f', FirstUsed, '{offset}')";
+            string lastUsedExpr = utcOffset == 0
+                ? "STRFTIME('%Y-%m-%d %H:%M:%f', LastUsed)"
+                : $"STRFTIME('%Y-%m-%d %H:%M:%f', LastUsed, '{offset}')";
+            string browser = EscapeSqlLiteral(browserName);
+            string categoryValue = string.IsNullOrWhiteSpace(category) ? "NULL" : $"'{EscapeSqlLiteral(category)}'";
+
+            string whereClause;
+            if (string.IsNullOrWhiteSpace(category))
+            {
+                whereClause = $"Browser = '{browser}' {CurrentAndFilter(SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "FieldName", "Value"), SearchSql.TimeCondition("FirstUsed", "LastUsed"))}";
+            }
+            else
+            {
+                List<int> ids = GetAutofillFacetRows(browserName)
+                    .Where(row => string.Equals(ClassifyAutofillFieldName(row.FieldName), category, StringComparison.OrdinalIgnoreCase))
+                    .Select(row => row.Id)
+                    .ToList();
+
+                whereClause = ids.Count == 0 ? "1 = 0" : $"id IN ({string.Join(",", ids)})";
+            }
+
+            return $@"
+                SELECT id, Artifact_type, Potential_activity, Browser, {categoryValue} AS FieldCategory,
+                       FieldName, Value, COALESCE(TimesUsed, Count) AS TimesUsed,
+                       {firstUsedExpr} AS FirstUsed,
+                       {lastUsedExpr} AS LastUsed,
+                       File, Label, Comment
+                FROM autofill_data
+                WHERE {whereClause};";
+        }
+
+        private List<(int Id, string? FieldName)> GetAutofillFacetRows(string browserName)
+        {
+            List<(int Id, string? FieldName)> rows = new List<(int Id, string? FieldName)>();
+            string browser = EscapeSqlLiteral(browserName);
+            string filter = CurrentAndFilter(
+                SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "FieldName", "Value"),
+                SearchSql.TimeCondition("FirstUsed", "LastUsed"));
+
+            string query = $@"
+                SELECT id, FieldName
+                FROM autofill_data
+                WHERE Browser = '{browser}' {filter};";
+
+            using SQLiteConnection connection = new SQLiteConnection(Helpers.chromeViewerConnectionString);
+            connection.Open();
+            using SQLiteCommand command = new SQLiteCommand(query, connection);
+            SearchSql.AddParameters(command);
+            using SQLiteDataReader reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                rows.Add((reader.GetInt32(0), reader.IsDBNull(1) ? null : reader.GetString(1)));
+            }
+
+            return rows;
+        }
+
+        private static string ClassifyAutofillFieldName(string? fieldName)
+        {
+            string field = (fieldName ?? string.Empty).Trim().ToLowerInvariant();
+            if (string.IsNullOrWhiteSpace(field))
+                return "Unknown";
+
+            if (field.Contains("email") || field.Contains("e-mail") || field == "mail")
+                return "Email";
+            if (field.Contains("phone") || field.Contains("tel") || field.Contains("mobile") || field.Contains("cell"))
+                return "Phone";
+            if (field.Contains("name") || field.Contains("first") || field.Contains("last") || field.Contains("surname") || field.Contains("fullname"))
+                return "Name";
+            if (field.Contains("address") || field.Contains("addr") || field.Contains("street") || field.Contains("city") || field.Contains("state") || field.Contains("zip") || field.Contains("postal") || field.Contains("country"))
+                return "Address";
+            if (field.Contains("card") || field.Contains("cc-") || field.Contains("credit") || field.Contains("payment") || field.Contains("billing") || field.Contains("iban") || field.Contains("bank"))
+                return "Payment";
+            if (field.Contains("user") || field.Contains("login") || field.Contains("account"))
+                return "Account";
+            if (field.Contains("search") || field.Contains("query") || field == "q")
+                return "Search";
+            if (field.Contains("company") || field.Contains("organization") || field.Contains("organisation") || field.Contains("job") || field.Contains("title"))
+                return "Work";
+
+            return "Other";
+        }
+
+        private Image GetAutofillFieldCategoryIcon(string category)
+        {
+            return category switch
+            {
+                "Email" => Resource1.Webmail.ToBitmap(),
+                "Phone" => Resource1.OnlineOfficeSuite.ToBitmap(),
+                "Name" => Resource1.id_icon,
+                "Address" => Resource1.LocalFiles.ToBitmap(),
+                "Payment" => Resource1.Banking.ToBitmap(),
+                "Account" => Resource1.id_icon,
+                "Search" => Resource1.SearchEngine.ToBitmap(),
+                "Work" => Resource1.OnlineOfficeSuite.ToBitmap(),
+                "Other" => Resource1.Other.ToBitmap(),
+                _ => Resource1.Unknown.ToBitmap(),
+            };
+        }
 
         private void AddCookieLabels(FlowLayoutPanel flwMain, Dictionary<string, int> browsersWithCookies)
         {
@@ -4352,7 +4624,7 @@ namespace Browser_Reviewer
                     : $"STRFTIME('%Y-%m-%d %H:%M:%f', LastAccessed, '{offset}')";
 
                 string whereClause = CurrentWhereFilter(
-                    SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Host", "Name", "Value", "Path"),
+                    SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Host", "Name", "Value", "ValueKind", "DecodedValuePreview", "DecoderNotes", "Path"),
                     SearchSql.TimeCondition("Created", "Expires", "LastAccessed"));
 
                 string sqlquery = $@"
@@ -4362,7 +4634,7 @@ namespace Browser_Reviewer
                         {expiresExpr} AS Expires,
                         {lastAccessedExpr} AS LastAccessed,
                         IsSecure, IsHttpOnly, IsPersistent, SameSite, SourceScheme, SourcePort,
-                        IsEncrypted, File, Label, Comment
+                        IsEncrypted, ValueKind, DecodedValuePreview, DecoderNotes, File, Label, Comment
                     FROM cookies_data
                     {whereClause};";
 
@@ -4402,45 +4674,208 @@ namespace Browser_Reviewer
                 lblNavegadorCookies.Width =
                     flwMain.ClientSize.Width - flwMain.Padding.Horizontal - lblNavegadorCookies.Margin.Horizontal;
 
+                FlowLayoutPanel flwCookieCategories = new FlowLayoutPanel
+                {
+                    Name = "flwSubNavegador",
+                    BackColor = Color.Beige,
+                    FlowDirection = FlowDirection.TopDown,
+                    WrapContents = false,
+                    AutoScroll = false,
+                    AutoSize = true,
+                    Height = 200,
+                    Margin = new Padding(0, 4, 0, 4),
+                    Padding = new Padding(4),
+                    Tag = "fullwidth"
+                };
+                flwCookieCategories.Width =
+                    flwMain.ClientSize.Width - flwMain.Padding.Horizontal - flwCookieCategories.Margin.Horizontal;
+
+                flwCookieCategories.SizeChanged += (s, e) =>
+                {
+                    int usable = flwCookieCategories.ClientSize.Width - flwCookieCategories.Padding.Horizontal;
+                    foreach (Control c in flwCookieCategories.Controls)
+                        if ((c.Tag as string) == "fullwidth")
+                            c.Width = Math.Max(0, usable - c.Margin.Horizontal);
+                };
+
+                Label lblAllBrowserCookies = BuildDownloadTypeLabel(
+                    "All Cookies",
+                    count,
+                    Helpers.FS,
+                    Resource1.AllHistory.ToBitmap(),
+                    flwCookieCategories);
+                lblAllBrowserCookies.Click += (sender, e) =>
+                {
+                    string sqlquery = BuildCookiesByDomainCategoryQuery(navegador, null);
+                    Tools.ShowQueryOnDataGridView(sfDataGrid1, Helpers.chromeViewerConnectionString, sqlquery, labelItemCount, Console);
+                    labelStatus.Text = $"Cookies from {navegador}";
+                };
+                flwCookieCategories.Controls.Add(lblAllBrowserCookies);
+
+                foreach (var categoryEntry in GetCookieDomainCategoryCounts(navegador).OrderBy(entry => entry.Key))
+                {
+                    Label lblCookieCategory = BuildDownloadTypeLabel(
+                        categoryEntry.Key,
+                        categoryEntry.Value,
+                        Helpers.FS,
+                        GetCookieDomainCategoryIcon(categoryEntry.Key),
+                        flwCookieCategories);
+                    lblCookieCategory.Click += (sender, e) =>
+                    {
+                        string sqlquery = BuildCookiesByDomainCategoryQuery(navegador, categoryEntry.Key);
+                        Tools.ShowQueryOnDataGridView(sfDataGrid1, Helpers.chromeViewerConnectionString, sqlquery, labelItemCount, Console);
+                        labelStatus.Text = $"{categoryEntry.Key} cookies from {navegador}";
+                    };
+                    flwCookieCategories.Controls.Add(lblCookieCategory);
+                }
+
                 lblNavegadorCookies.MouseHover += (sender, e) => { lblNavegadorCookies.BackColor = Color.LightBlue; };
                 lblNavegadorCookies.MouseLeave += (sender, e) => { lblNavegadorCookies.BackColor = Color.SteelBlue; };
 
                 lblNavegadorCookies.Click += (sender, e) =>
                 {
-                    int utcOffset = Helpers.utcOffset;
-                    string? offset = utcOffset == 0 ? null : (utcOffset > 0 ? $"+{utcOffset} hours" : $"{utcOffset} hours");
-
-                    string createdExpr = offset == null
-                        ? "STRFTIME('%Y-%m-%d %H:%M:%f', Created)"
-                        : $"STRFTIME('%Y-%m-%d %H:%M:%f', Created, '{offset}')";
-                    string expiresExpr = offset == null
-                        ? "STRFTIME('%Y-%m-%d %H:%M:%f', Expires)"
-                        : $"STRFTIME('%Y-%m-%d %H:%M:%f', Expires, '{offset}')";
-                    string lastAccessedExpr = offset == null
-                        ? "STRFTIME('%Y-%m-%d %H:%M:%f', LastAccessed)"
-                        : $"STRFTIME('%Y-%m-%d %H:%M:%f', LastAccessed, '{offset}')";
-
-                    string filterCondition = CurrentAndFilter(
-                        SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Host", "Name", "Value", "Path"),
-                        SearchSql.TimeCondition("Created", "Expires", "LastAccessed"));
-
-                    string sqlquery = $@"
-                        SELECT
-                            id, Artifact_type, Potential_activity, Browser, Host, Name, Value, Path,
-                            {createdExpr} AS Created,
-                            {expiresExpr} AS Expires,
-                            {lastAccessedExpr} AS LastAccessed,
-                            IsSecure, IsHttpOnly, IsPersistent, SameSite, SourceScheme, SourcePort,
-                            IsEncrypted, File, Label, Comment
-                        FROM cookies_data
-                        WHERE Browser = '{navegador}' {filterCondition};";
-
-                    Tools.ShowQueryOnDataGridView(sfDataGrid1, Helpers.chromeViewerConnectionString, sqlquery, labelItemCount, Console);
-                    labelStatus.Text = $"Cookies from {navegador}";
+                    flwCookieCategories.Visible = !flwCookieCategories.Visible;
                 };
 
                 flwMain.Controls.Add(lblNavegadorCookies);
+                flwMain.Controls.Add(flwCookieCategories);
+
+                flwCookieCategories.Visible = false;
             }
+        }
+
+        private Dictionary<string, int> GetCookieDomainCategoryCounts(string browserName)
+        {
+            Dictionary<string, int> counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var row in GetCookieFacetRows(browserName))
+            {
+                string category = ClassifyCookieHost(row.Host);
+                counts[category] = counts.TryGetValue(category, out int count) ? count + 1 : 1;
+            }
+
+            return counts;
+        }
+
+        private string BuildCookiesByDomainCategoryQuery(string browserName, string? category)
+        {
+            int utcOffset = Helpers.utcOffset;
+            string? offset = utcOffset == 0 ? null : (utcOffset > 0 ? $"+{utcOffset} hours" : $"{utcOffset} hours");
+            string createdExpr = offset == null
+                ? "STRFTIME('%Y-%m-%d %H:%M:%f', Created)"
+                : $"STRFTIME('%Y-%m-%d %H:%M:%f', Created, '{offset}')";
+            string expiresExpr = offset == null
+                ? "STRFTIME('%Y-%m-%d %H:%M:%f', Expires)"
+                : $"STRFTIME('%Y-%m-%d %H:%M:%f', Expires, '{offset}')";
+            string lastAccessedExpr = offset == null
+                ? "STRFTIME('%Y-%m-%d %H:%M:%f', LastAccessed)"
+                : $"STRFTIME('%Y-%m-%d %H:%M:%f', LastAccessed, '{offset}')";
+            string browser = EscapeSqlLiteral(browserName);
+            string categoryValue = string.IsNullOrWhiteSpace(category) ? "NULL" : $"'{EscapeSqlLiteral(category)}'";
+
+            string whereClause;
+            if (string.IsNullOrWhiteSpace(category))
+            {
+                whereClause = $"Browser = '{browser}' {CurrentAndFilter(SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Host", "Name", "Value", "ValueKind", "DecodedValuePreview", "DecoderNotes", "Path"), SearchSql.TimeCondition("Created", "Expires", "LastAccessed"))}";
+            }
+            else
+            {
+                List<int> ids = GetCookieFacetRows(browserName)
+                    .Where(row => string.Equals(ClassifyCookieHost(row.Host), category, StringComparison.OrdinalIgnoreCase))
+                    .Select(row => row.Id)
+                    .ToList();
+
+                whereClause = ids.Count == 0 ? "1 = 0" : $"id IN ({string.Join(",", ids)})";
+            }
+
+            return $@"
+                SELECT id, Artifact_type, Potential_activity, Browser, {categoryValue} AS DomainCategory,
+                       Host, Name, Value, Path,
+                       {createdExpr} AS Created,
+                       {expiresExpr} AS Expires,
+                       {lastAccessedExpr} AS LastAccessed,
+                       IsSecure, IsHttpOnly, IsPersistent, SameSite, SourceScheme, SourcePort,
+                       IsEncrypted, ValueKind, DecodedValuePreview, DecoderNotes, File, Label, Comment
+                FROM cookies_data
+                WHERE {whereClause};";
+        }
+
+        private List<(int Id, string? Host)> GetCookieFacetRows(string browserName)
+        {
+            List<(int Id, string? Host)> rows = new List<(int Id, string? Host)>();
+            string browser = EscapeSqlLiteral(browserName);
+            string filter = CurrentAndFilter(
+                SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Host", "Name", "Value", "ValueKind", "DecodedValuePreview", "DecoderNotes", "Path"),
+                SearchSql.TimeCondition("Created", "Expires", "LastAccessed"));
+
+            string query = $@"
+                SELECT id, Host
+                FROM cookies_data
+                WHERE Browser = '{browser}' {filter};";
+
+            using SQLiteConnection connection = new SQLiteConnection(Helpers.chromeViewerConnectionString);
+            connection.Open();
+            using SQLiteCommand command = new SQLiteCommand(query, connection);
+            SearchSql.AddParameters(command);
+            using SQLiteDataReader reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                rows.Add((reader.GetInt32(0), reader.IsDBNull(1) ? null : reader.GetString(1)));
+            }
+
+            return rows;
+        }
+
+        private static string ClassifyCookieHost(string? host)
+        {
+            string normalized = NormalizeCookieHost(host);
+            if (string.IsNullOrWhiteSpace(normalized))
+                return "Unknown";
+
+            string historyCategory = MyTools.Evaluatecategory($"https://{normalized}/");
+            if (!string.Equals(historyCategory, "Other", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(historyCategory, "Unknown", StringComparison.OrdinalIgnoreCase))
+            {
+                return historyCategory;
+            }
+
+            return GetCookieBaseDomain(normalized);
+        }
+
+        private static string NormalizeCookieHost(string? host)
+        {
+            string normalized = (host ?? string.Empty).Trim().TrimStart('.').ToLowerInvariant();
+            if (normalized.Contains(':'))
+                normalized = normalized.Split(':')[0];
+            return normalized;
+        }
+
+        private static string GetCookieBaseDomain(string host)
+        {
+            if (string.IsNullOrWhiteSpace(host))
+                return "Unknown";
+
+            if (System.Net.IPAddress.TryParse(host, out _))
+                return "Lan Addresses Browsing";
+
+            string[] parts = host.Split('.', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length <= 2)
+                return host;
+
+            string lastTwo = $"{parts[^2]}.{parts[^1]}";
+            string[] secondLevelSuffixes = { "com", "co", "org", "net", "gov", "edu", "ac" };
+            if (parts.Length >= 3 && secondLevelSuffixes.Contains(parts[^2], StringComparer.OrdinalIgnoreCase) && parts[^1].Length == 2)
+                return $"{parts[^3]}.{lastTwo}";
+
+            return lastTwo;
+        }
+
+        private Image GetCookieDomainCategoryIcon(string category)
+        {
+            if (category.Contains('.'))
+                return Resource1.url_icon;
+
+            return GetHistoryCategoryIcon(category);
         }
 
 
@@ -4468,7 +4903,7 @@ namespace Browser_Reviewer
             lblAllCacheButton.Click += (sender, e) =>
             {
                 string sqlquery = BuildCacheSelectQuery(CurrentWhereFilter(
-                    SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Url", "Host", "ContentType", "CacheType", "Server", "CacheFile", "CacheKey", "BodyPreview", "DetectedFileType", "DetectedExtension"),
+                    SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Url", "Host", "ContentType", "CacheType", "Server", "CacheFile", "CacheKey", "BodyPreview", "BodyKind", "DecodedBodyPreview", "BodyDecoderNotes", "DetectedFileType", "DetectedExtension"),
                     SearchSql.TimeCondition("Created", "Modified", "LastAccessed")));
                 Tools.ShowQueryOnDataGridView(sfDataGrid1, Helpers.chromeViewerConnectionString, sqlquery, labelItemCount, Console);
                 labelStatus.Text = "All cache from all browsers";
@@ -4504,21 +4939,174 @@ namespace Browser_Reviewer
                 lblNavegadorCache.Width =
                     flwMain.ClientSize.Width - flwMain.Padding.Horizontal - lblNavegadorCache.Margin.Horizontal;
 
+                FlowLayoutPanel flwCacheCategories = new FlowLayoutPanel
+                {
+                    Name = "flwSubNavegador",
+                    BackColor = Color.Beige,
+                    FlowDirection = FlowDirection.TopDown,
+                    WrapContents = false,
+                    AutoScroll = false,
+                    AutoSize = true,
+                    Height = 200,
+                    Margin = new Padding(0, 4, 0, 4),
+                    Padding = new Padding(4),
+                    Tag = "fullwidth"
+                };
+                flwCacheCategories.Width =
+                    flwMain.ClientSize.Width - flwMain.Padding.Horizontal - flwCacheCategories.Margin.Horizontal;
+
+                flwCacheCategories.SizeChanged += (s, e) =>
+                {
+                    int usable = flwCacheCategories.ClientSize.Width - flwCacheCategories.Padding.Horizontal;
+                    foreach (Control c in flwCacheCategories.Controls)
+                        if ((c.Tag as string) == "fullwidth")
+                            c.Width = Math.Max(0, usable - c.Margin.Horizontal);
+                };
+
+                Label lblAllBrowserCache = BuildDownloadTypeLabel(
+                    "All Cache",
+                    count,
+                    Helpers.FS,
+                    Resource1.AllHistory.ToBitmap(),
+                    flwCacheCategories);
+                lblAllBrowserCache.Click += (sender, e) =>
+                {
+                    string sqlquery = BuildCacheByDetectedFileTypeQuery(navegador, null);
+                    Tools.ShowQueryOnDataGridView(sfDataGrid1, Helpers.chromeViewerConnectionString, sqlquery, labelItemCount, Console);
+                    labelStatus.Text = $"Cache from {navegador}";
+                };
+                flwCacheCategories.Controls.Add(lblAllBrowserCache);
+
+                foreach (var categoryEntry in GetCacheDetectedFileTypeCounts(navegador).OrderBy(entry => entry.Key))
+                {
+                    Label lblCacheCategory = BuildDownloadTypeLabel(
+                        categoryEntry.Key,
+                        categoryEntry.Value,
+                        Helpers.FS,
+                        GetCacheFileTypeIcon(categoryEntry.Key),
+                        flwCacheCategories);
+                    lblCacheCategory.Click += (sender, e) =>
+                    {
+                        string sqlquery = BuildCacheByDetectedFileTypeQuery(navegador, categoryEntry.Key);
+                        Tools.ShowQueryOnDataGridView(sfDataGrid1, Helpers.chromeViewerConnectionString, sqlquery, labelItemCount, Console);
+                        labelStatus.Text = $"{categoryEntry.Key} cache from {navegador}";
+                    };
+                    flwCacheCategories.Controls.Add(lblCacheCategory);
+                }
+
                 lblNavegadorCache.MouseHover += (sender, e) => { lblNavegadorCache.BackColor = Color.LightBlue; };
                 lblNavegadorCache.MouseLeave += (sender, e) => { lblNavegadorCache.BackColor = Color.SteelBlue; };
 
                 lblNavegadorCache.Click += (sender, e) =>
                 {
-                    string filterCondition = CurrentAndFilter(
-                        SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Url", "Host", "ContentType", "CacheType", "Server", "CacheFile", "CacheKey", "BodyPreview", "DetectedFileType", "DetectedExtension"),
-                        SearchSql.TimeCondition("Created", "Modified", "LastAccessed"));
-                    string sqlquery = BuildCacheSelectQuery($"WHERE Browser = '{navegador}' {filterCondition}");
-                    Tools.ShowQueryOnDataGridView(sfDataGrid1, Helpers.chromeViewerConnectionString, sqlquery, labelItemCount, Console);
-                    labelStatus.Text = $"Cache from {navegador}";
+                    flwCacheCategories.Visible = !flwCacheCategories.Visible;
                 };
 
                 flwMain.Controls.Add(lblNavegadorCache);
+                flwMain.Controls.Add(flwCacheCategories);
+
+                flwCacheCategories.Visible = false;
             }
+        }
+
+
+        private Dictionary<string, int> GetCacheDetectedFileTypeCounts(string browserName)
+        {
+            Dictionary<string, int> counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var row in GetCacheFacetRows(browserName))
+            {
+                string category = ClassifyCacheFileType(row.DetectedFileType, row.ContentType);
+                counts[category] = counts.TryGetValue(category, out int count) ? count + 1 : 1;
+            }
+
+            return counts;
+        }
+
+        private string BuildCacheByDetectedFileTypeQuery(string browserName, string? category)
+        {
+            string browser = EscapeSqlLiteral(browserName);
+            string whereClause;
+            if (string.IsNullOrWhiteSpace(category))
+            {
+                whereClause = $"WHERE Browser = '{browser}' {CurrentAndFilter(SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Url", "Host", "ContentType", "CacheType", "Server", "CacheFile", "CacheKey", "BodyPreview", "BodyKind", "DecodedBodyPreview", "BodyDecoderNotes", "DetectedFileType", "DetectedExtension"), SearchSql.TimeCondition("Created", "Modified", "LastAccessed"))}";
+            }
+            else
+            {
+                List<int> ids = GetCacheFacetRows(browserName)
+                    .Where(row => string.Equals(ClassifyCacheFileType(row.DetectedFileType, row.ContentType), category, StringComparison.OrdinalIgnoreCase))
+                    .Select(row => row.Id)
+                    .ToList();
+
+                whereClause = ids.Count == 0 ? "WHERE 1 = 0" : $"WHERE id IN ({string.Join(",", ids)})";
+            }
+
+            return BuildCacheSelectQuery(whereClause);
+        }
+
+        private List<(int Id, string? DetectedFileType, string? ContentType)> GetCacheFacetRows(string browserName)
+        {
+            List<(int Id, string? DetectedFileType, string? ContentType)> rows = new List<(int Id, string? DetectedFileType, string? ContentType)>();
+            string browser = EscapeSqlLiteral(browserName);
+            string filter = CurrentAndFilter(
+                SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Url", "Host", "ContentType", "CacheType", "Server", "CacheFile", "CacheKey", "BodyPreview", "BodyKind", "DecodedBodyPreview", "BodyDecoderNotes", "DetectedFileType", "DetectedExtension"),
+                SearchSql.TimeCondition("Created", "Modified", "LastAccessed"));
+
+            string query = $@"
+                SELECT id, DetectedFileType, ContentType
+                FROM cache_data
+                WHERE Browser = '{browser}' {filter};";
+
+            using SQLiteConnection connection = new SQLiteConnection(Helpers.chromeViewerConnectionString);
+            connection.Open();
+            using SQLiteCommand command = new SQLiteCommand(query, connection);
+            SearchSql.AddParameters(command);
+            using SQLiteDataReader reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                rows.Add((
+                    reader.GetInt32(0),
+                    reader.IsDBNull(1) ? null : reader.GetString(1),
+                    reader.IsDBNull(2) ? null : reader.GetString(2)));
+            }
+
+            return rows;
+        }
+
+        private static string ClassifyCacheFileType(string? detectedFileType, string? contentType)
+        {
+            if (!string.IsNullOrWhiteSpace(detectedFileType))
+                return detectedFileType.Trim();
+
+            string content = (contentType ?? string.Empty).Trim().ToLowerInvariant();
+            if (string.IsNullOrWhiteSpace(content))
+                return "Unknown";
+
+            if (content.StartsWith("image/")) return "Image";
+            if (content.StartsWith("video/")) return "Video";
+            if (content.StartsWith("audio/")) return "Audio";
+            if (content.Contains("json")) return "JSON";
+            if (content.Contains("html")) return "HTML";
+            if (content.Contains("javascript")) return "JavaScript";
+            if (content.Contains("css")) return "CSS";
+            if (content.Contains("xml")) return "XML";
+            if (content.Contains("pdf")) return "PDF";
+            if (content.StartsWith("text/")) return "Text";
+            if (content.Contains("zip") || content.Contains("compressed")) return "Archive";
+
+            return contentType?.Trim() ?? "Unknown";
+        }
+
+        private Image GetCacheFileTypeIcon(string fileType)
+        {
+            string normalized = (fileType ?? string.Empty).ToLowerInvariant();
+            if (IsImageFileCategory(normalized)) return GetImageFileIcon();
+            if (IsVideoFileCategory(normalized)) return GetVideoFileIcon();
+            if (IsAudioFileCategory(normalized)) return GetAudioFileIcon();
+            if (normalized.Contains("json") || normalized.Contains("html") || normalized.Contains("javascript") || normalized.Contains("css") || normalized.Contains("xml")) return Resource1.CodeHosting.ToBitmap();
+            if (normalized.Contains("pdf") || normalized.Contains("text")) return Resource1.OnlineOfficeSuite.ToBitmap();
+            if (normalized.Contains("archive") || normalized.Contains("zip")) return Resource1.FileEncryptionTools.ToBitmap();
+            return Resource1.file_icon;
         }
 
 
@@ -4543,6 +5131,7 @@ namespace Browser_Reviewer
                     {modifiedExpr} AS Modified,
                     {lastAccessedExpr} AS LastAccessed,
                     CacheFile, CacheKey, BodySize, BodySha256, BodyStored, BodyPreview,
+                    BodyKind, DecodedBodyPreview, BodyDecoderNotes,
                     DetectedFileType, DetectedExtension, File, Label, Comment
                 FROM cache_data
                 {whereClause};";
@@ -4608,22 +5197,167 @@ namespace Browser_Reviewer
                 lblNavegadorSessions.Width =
                     flwMain.ClientSize.Width - flwMain.Padding.Horizontal - lblNavegadorSessions.Margin.Horizontal;
 
+                FlowLayoutPanel flwSessionCategories = new FlowLayoutPanel
+                {
+                    Name = "flwSubNavegador",
+                    BackColor = Color.Beige,
+                    FlowDirection = FlowDirection.TopDown,
+                    WrapContents = false,
+                    AutoScroll = false,
+                    AutoSize = true,
+                    Height = 200,
+                    Margin = new Padding(0, 4, 0, 4),
+                    Padding = new Padding(4),
+                    Tag = "fullwidth"
+                };
+                flwSessionCategories.Width =
+                    flwMain.ClientSize.Width - flwMain.Padding.Horizontal - flwSessionCategories.Margin.Horizontal;
+
+                flwSessionCategories.SizeChanged += (s, e) =>
+                {
+                    int usable = flwSessionCategories.ClientSize.Width - flwSessionCategories.Padding.Horizontal;
+                    foreach (Control c in flwSessionCategories.Controls)
+                        if ((c.Tag as string) == "fullwidth")
+                            c.Width = Math.Max(0, usable - c.Margin.Horizontal);
+                };
+
+                Label lblAllBrowserSessions = BuildDownloadTypeLabel(
+                    "All Sessions",
+                    count,
+                    Helpers.FS,
+                    Resource1.AllHistory.ToBitmap(),
+                    flwSessionCategories);
+                lblAllBrowserSessions.Click += (sender, e) =>
+                {
+                    string sqlquery = BuildSessionsByDomainCategoryQuery(navegador, null);
+                    Tools.ShowQueryOnDataGridView(sfDataGrid1, Helpers.chromeViewerConnectionString, sqlquery, labelItemCount, Console);
+                    labelStatus.Text = $"Sessions from {navegador}";
+                };
+                flwSessionCategories.Controls.Add(lblAllBrowserSessions);
+
+                foreach (var categoryEntry in GetSessionDomainCategoryCounts(navegador).OrderBy(entry => entry.Key))
+                {
+                    Label lblSessionCategory = BuildDownloadTypeLabel(
+                        categoryEntry.Key,
+                        categoryEntry.Value,
+                        Helpers.FS,
+                        GetSessionDomainCategoryIcon(categoryEntry.Key),
+                        flwSessionCategories);
+                    lblSessionCategory.Click += (sender, e) =>
+                    {
+                        string sqlquery = BuildSessionsByDomainCategoryQuery(navegador, categoryEntry.Key);
+                        Tools.ShowQueryOnDataGridView(sfDataGrid1, Helpers.chromeViewerConnectionString, sqlquery, labelItemCount, Console);
+                        labelStatus.Text = $"{categoryEntry.Key} sessions from {navegador}";
+                    };
+                    flwSessionCategories.Controls.Add(lblSessionCategory);
+                }
+
                 lblNavegadorSessions.MouseHover += (sender, e) => { lblNavegadorSessions.BackColor = Color.LightBlue; };
                 lblNavegadorSessions.MouseLeave += (sender, e) => { lblNavegadorSessions.BackColor = Color.SteelBlue; };
 
                 lblNavegadorSessions.Click += (sender, e) =>
                 {
-                    string filterCondition = CurrentAndFilter(
-                        SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Url", "Title", "OriginalUrl", "Referrer", "SessionFile", "SourceType"),
-                        SearchSql.TimeCondition("LastAccessed", "Created"));
-                    string sqlquery = BuildSessionSelectQuery($"WHERE Browser = '{navegador}' {filterCondition}");
-                    Tools.ShowQueryOnDataGridView(sfDataGrid1, Helpers.chromeViewerConnectionString, sqlquery, labelItemCount, Console);
-                    labelStatus.Text = $"Sessions from {navegador}";
+                    flwSessionCategories.Visible = !flwSessionCategories.Visible;
                 };
 
                 Helpers.sessionLabels[navegador] = lblNavegadorSessions;
                 flwMain.Controls.Add(lblNavegadorSessions);
+                flwMain.Controls.Add(flwSessionCategories);
+
+                flwSessionCategories.Visible = false;
             }
+        }
+
+        private Dictionary<string, int> GetSessionDomainCategoryCounts(string browserName)
+        {
+            Dictionary<string, int> counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var row in GetSessionFacetRows(browserName))
+            {
+                string category = ClassifySessionUrl(row.Url);
+                counts[category] = counts.TryGetValue(category, out int count) ? count + 1 : 1;
+            }
+
+            return counts;
+        }
+
+        private string BuildSessionsByDomainCategoryQuery(string browserName, string? category)
+        {
+            string browser = EscapeSqlLiteral(browserName);
+            string whereClause;
+            if (string.IsNullOrWhiteSpace(category))
+            {
+                whereClause = $"WHERE Browser = '{browser}' {CurrentAndFilter(SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Url", "Title", "OriginalUrl", "Referrer", "SessionFile", "SourceType"), SearchSql.TimeCondition("LastAccessed", "Created"))}";
+            }
+            else
+            {
+                List<int> ids = GetSessionFacetRows(browserName)
+                    .Where(row => string.Equals(ClassifySessionUrl(row.Url), category, StringComparison.OrdinalIgnoreCase))
+                    .Select(row => row.Id)
+                    .ToList();
+
+                whereClause = ids.Count == 0 ? "WHERE 1 = 0" : $"WHERE id IN ({string.Join(",", ids)})";
+            }
+
+            return BuildSessionSelectQuery(whereClause);
+        }
+
+        private List<(int Id, string? Url)> GetSessionFacetRows(string browserName)
+        {
+            List<(int Id, string? Url)> rows = new List<(int Id, string? Url)>();
+            string browser = EscapeSqlLiteral(browserName);
+            string filter = CurrentAndFilter(
+                SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Url", "Title", "OriginalUrl", "Referrer", "SessionFile", "SourceType"),
+                SearchSql.TimeCondition("LastAccessed", "Created"));
+
+            string query = $@"
+                SELECT id, Url
+                FROM session_data
+                WHERE Browser = '{browser}' {filter};";
+
+            using SQLiteConnection connection = new SQLiteConnection(Helpers.chromeViewerConnectionString);
+            connection.Open();
+            using SQLiteCommand command = new SQLiteCommand(query, connection);
+            SearchSql.AddParameters(command);
+            using SQLiteDataReader reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                rows.Add((reader.GetInt32(0), reader.IsDBNull(1) ? null : reader.GetString(1)));
+            }
+
+            return rows;
+        }
+
+        private static string ClassifySessionUrl(string? url)
+        {
+            string value = (url ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(value))
+                return "Unknown";
+
+            string historyCategory = MyTools.Evaluatecategory(value);
+            if (!string.Equals(historyCategory, "Other", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(historyCategory, "Unknown", StringComparison.OrdinalIgnoreCase))
+            {
+                return historyCategory;
+            }
+
+            try
+            {
+                Uri uri = new Uri(value);
+                return GetCookieBaseDomain(uri.Host.ToLowerInvariant());
+            }
+            catch
+            {
+                return "Unknown";
+            }
+        }
+
+        private Image GetSessionDomainCategoryIcon(string category)
+        {
+            if (category.Contains('.'))
+                return Resource1.url_icon;
+
+            return GetHistoryCategoryIcon(category);
         }
 
         private string BuildSessionSelectQuery(string whereClause)
@@ -4701,22 +5435,226 @@ namespace Browser_Reviewer
                 lblNavegadorExtensions.Width =
                     flwMain.ClientSize.Width - flwMain.Padding.Horizontal - lblNavegadorExtensions.Margin.Horizontal;
 
+                FlowLayoutPanel flwExtensionCategories = new FlowLayoutPanel
+                {
+                    Name = "flwSubNavegador",
+                    BackColor = Color.Beige,
+                    FlowDirection = FlowDirection.TopDown,
+                    WrapContents = false,
+                    AutoScroll = false,
+                    AutoSize = true,
+                    Height = 200,
+                    Margin = new Padding(0, 4, 0, 4),
+                    Padding = new Padding(4),
+                    Tag = "fullwidth"
+                };
+                flwExtensionCategories.Width =
+                    flwMain.ClientSize.Width - flwMain.Padding.Horizontal - flwExtensionCategories.Margin.Horizontal;
+
+                flwExtensionCategories.SizeChanged += (s, e) =>
+                {
+                    int usable = flwExtensionCategories.ClientSize.Width - flwExtensionCategories.Padding.Horizontal;
+                    foreach (Control c in flwExtensionCategories.Controls)
+                        if ((c.Tag as string) == "fullwidth")
+                            c.Width = Math.Max(0, usable - c.Margin.Horizontal);
+                };
+
+                Label lblAllBrowserExtensions = BuildDownloadTypeLabel(
+                    "All Extensions",
+                    count,
+                    Helpers.FS,
+                    Resource1.AllHistory.ToBitmap(),
+                    flwExtensionCategories);
+                lblAllBrowserExtensions.Click += (sender, e) =>
+                {
+                    string sqlquery = BuildExtensionsByCapabilityCategoryQuery(navegador, null);
+                    Tools.ShowQueryOnDataGridView(sfDataGrid1, Helpers.chromeViewerConnectionString, sqlquery, labelItemCount, Console);
+                    labelStatus.Text = $"Extensions from {navegador}";
+                };
+                flwExtensionCategories.Controls.Add(lblAllBrowserExtensions);
+
+                foreach (var categoryEntry in GetExtensionCapabilityCategoryCounts(navegador).OrderBy(entry => ExtensionCategorySortOrder(entry.Key)).ThenBy(entry => entry.Key))
+                {
+                    Label lblExtensionCategory = BuildDownloadTypeLabel(
+                        categoryEntry.Key,
+                        categoryEntry.Value,
+                        Helpers.FS,
+                        GetExtensionCapabilityIcon(categoryEntry.Key),
+                        flwExtensionCategories);
+                    lblExtensionCategory.Click += (sender, e) =>
+                    {
+                        string sqlquery = BuildExtensionsByCapabilityCategoryQuery(navegador, categoryEntry.Key);
+                        Tools.ShowQueryOnDataGridView(sfDataGrid1, Helpers.chromeViewerConnectionString, sqlquery, labelItemCount, Console);
+                        labelStatus.Text = $"{categoryEntry.Key} extensions from {navegador}";
+                    };
+                    flwExtensionCategories.Controls.Add(lblExtensionCategory);
+                }
+
                 lblNavegadorExtensions.MouseHover += (sender, e) => { lblNavegadorExtensions.BackColor = Color.LightBlue; };
                 lblNavegadorExtensions.MouseLeave += (sender, e) => { lblNavegadorExtensions.BackColor = Color.SteelBlue; };
 
                 lblNavegadorExtensions.Click += (sender, e) =>
                 {
-                    string filterCondition = CurrentAndFilter(
-                        SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "ExtensionId", "Name", "Version", "Description", "Author", "HomepageUrl", "UpdateUrl", "Permissions", "HostPermissions", "ExtensionPath", "SourceFile"),
-                        SearchSql.TimeCondition("InstallTime", "LastUpdateTime"));
-                    string sqlquery = BuildExtensionSelectQuery($"WHERE Browser = '{navegador}' {filterCondition}");
-                    Tools.ShowQueryOnDataGridView(sfDataGrid1, Helpers.chromeViewerConnectionString, sqlquery, labelItemCount, Console);
-                    labelStatus.Text = $"Extensions from {navegador}";
+                    flwExtensionCategories.Visible = !flwExtensionCategories.Visible;
                 };
 
                 Helpers.extensionLabels[navegador] = lblNavegadorExtensions;
                 flwMain.Controls.Add(lblNavegadorExtensions);
+                flwMain.Controls.Add(flwExtensionCategories);
+
+                flwExtensionCategories.Visible = false;
             }
+        }
+
+        private Dictionary<string, int> GetExtensionCapabilityCategoryCounts(string browserName)
+        {
+            Dictionary<string, int> counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var row in GetExtensionFacetRows(browserName))
+            {
+                string category = ClassifyExtensionCapability(row);
+                counts[category] = counts.TryGetValue(category, out int count) ? count + 1 : 1;
+            }
+
+            return counts;
+        }
+
+        private string BuildExtensionsByCapabilityCategoryQuery(string browserName, string? category)
+        {
+            string browser = EscapeSqlLiteral(browserName);
+            string whereClause;
+            if (string.IsNullOrWhiteSpace(category))
+            {
+                whereClause = $"WHERE Browser = '{browser}' {CurrentAndFilter(SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "ExtensionId", "Name", "Version", "Description", "Author", "HomepageUrl", "UpdateUrl", "Permissions", "HostPermissions", "ExtensionPath", "SourceFile"), SearchSql.TimeCondition("InstallTime", "LastUpdateTime"))}";
+            }
+            else
+            {
+                List<int> ids = GetExtensionFacetRows(browserName)
+                    .Where(row => string.Equals(ClassifyExtensionCapability(row), category, StringComparison.OrdinalIgnoreCase))
+                    .Select(row => row.Id)
+                    .ToList();
+
+                whereClause = ids.Count == 0 ? "WHERE 1 = 0" : $"WHERE id IN ({string.Join(",", ids)})";
+            }
+
+            return BuildExtensionSelectQuery(whereClause);
+        }
+
+        private List<ExtensionFacetRow> GetExtensionFacetRows(string browserName)
+        {
+            List<ExtensionFacetRow> rows = new List<ExtensionFacetRow>();
+            string browser = EscapeSqlLiteral(browserName);
+            string filter = CurrentAndFilter(
+                SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "ExtensionId", "Name", "Version", "Description", "Author", "HomepageUrl", "UpdateUrl", "Permissions", "HostPermissions", "ExtensionPath", "SourceFile"),
+                SearchSql.TimeCondition("InstallTime", "LastUpdateTime"));
+
+            string query = $@"
+                SELECT id, Name, Description, Enabled, Permissions, HostPermissions, ManifestVersion
+                FROM extension_data
+                WHERE Browser = '{browser}' {filter};";
+
+            using SQLiteConnection connection = new SQLiteConnection(Helpers.chromeViewerConnectionString);
+            connection.Open();
+            using SQLiteCommand command = new SQLiteCommand(query, connection);
+            SearchSql.AddParameters(command);
+            using SQLiteDataReader reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                rows.Add(new ExtensionFacetRow
+                {
+                    Id = reader.GetInt32(0),
+                    Name = reader.IsDBNull(1) ? null : reader.GetString(1),
+                    Description = reader.IsDBNull(2) ? null : reader.GetString(2),
+                    Enabled = reader.IsDBNull(3) ? 1 : reader.GetInt32(3),
+                    Permissions = reader.IsDBNull(4) ? null : reader.GetString(4),
+                    HostPermissions = reader.IsDBNull(5) ? null : reader.GetString(5),
+                    ManifestVersion = reader.IsDBNull(6) ? 0 : reader.GetInt32(6)
+                });
+            }
+
+            return rows;
+        }
+
+        private static string ClassifyExtensionCapability(ExtensionFacetRow row)
+        {
+            string permissions = (row.Permissions ?? string.Empty).ToLowerInvariant();
+            string hostPermissions = (row.HostPermissions ?? string.Empty).ToLowerInvariant();
+            string text = $"{row.Name} {row.Description} {permissions} {hostPermissions}".ToLowerInvariant();
+            string combinedPermissions = $"{permissions} {hostPermissions}";
+
+            string[] highRisk = { "cookies", "webrequest", "webrequestblocking", "debugger", "proxy", "nativemessaging", "native_messaging", "downloads", "download", "management", "tabs", "history", "bookmarks", "privacy", "scripting", "clipboardread", "clipboardwrite", "geolocation", "browsingdata" };
+            if (highRisk.Any(permission => permissions.Contains(permission)))
+                return "High Risk Permissions";
+
+            if (combinedPermissions.Contains("<all_urls>") ||
+                combinedPermissions.Contains("all_urls") ||
+                combinedPermissions.Contains("*://*/*") ||
+                combinedPermissions.Contains("http://*/*") ||
+                combinedPermissions.Contains("https://*/*"))
+                return "Broad Host Access";
+
+            string[] privacy = { "password", "credential", "login", "auth", "privacy", "vpn", "proxy", "cookie", "wallet", "2fa", "mfa", "token", "session" };
+            if (privacy.Any(token => text.Contains(token)))
+                return "Credential / Privacy Relevant";
+
+            string[] blocking = { "declarativenetrequest", "declarative_net_request", "webrequest", "adblock", "ad block", "ublock", "blocker", "filter", "adguard", "privacy badger" };
+            if (blocking.Any(token => text.Contains(token)))
+                return "Ad Blocking / Filtering";
+
+            string[] developer = { "debugger", "devtools", "developer", "selenium", "automation", "script", "userscript", "tampermonkey", "violentmonkey" };
+            if (developer.Any(token => text.Contains(token)))
+                return "Developer / Automation";
+
+            if (row.Enabled == 0)
+                return "Disabled Extensions";
+
+            if (row.ManifestVersion == 2)
+                return "Manifest V2";
+
+            return "Regular Extensions";
+        }
+
+        private static int ExtensionCategorySortOrder(string category)
+        {
+            return category switch
+            {
+                "High Risk Permissions" => 0,
+                "Broad Host Access" => 1,
+                "Credential / Privacy Relevant" => 2,
+                "Ad Blocking / Filtering" => 3,
+                "Developer / Automation" => 4,
+                "Disabled Extensions" => 5,
+                "Manifest V2" => 6,
+                "Regular Extensions" => 7,
+                _ => 99
+            };
+        }
+
+        private Image GetExtensionCapabilityIcon(string category)
+        {
+            return category switch
+            {
+                "High Risk Permissions" => Resource1.HackingCybersecuritySites.ToBitmap(),
+                "Broad Host Access" => Resource1.LanAddressesBrowsing.ToBitmap(),
+                "Credential / Privacy Relevant" => Resource1.Banking.ToBitmap(),
+                "Ad Blocking / Filtering" => Resource1.AdTrackingAnalytics.ToBitmap(),
+                "Developer / Automation" => Resource1.CodeHosting.ToBitmap(),
+                "Disabled Extensions" => Resource1.Unknown.ToBitmap(),
+                "Manifest V2" => Resource1.FileEncryptionTools.ToBitmap(),
+                "Regular Extensions" => Resource1.Other.ToBitmap(),
+                _ => Resource1.Unknown.ToBitmap()
+            };
+        }
+
+        private class ExtensionFacetRow
+        {
+            public int Id { get; set; }
+            public string? Name { get; set; }
+            public string? Description { get; set; }
+            public int Enabled { get; set; }
+            public string? Permissions { get; set; }
+            public string? HostPermissions { get; set; }
+            public int ManifestVersion { get; set; }
         }
 
         private string BuildExtensionSelectQuery(string whereClause)
@@ -4760,7 +5698,7 @@ namespace Browser_Reviewer
             lblAllLoginsButton.Click += (sender, e) =>
             {
                 string sqlquery = BuildLoginSelectQuery(CurrentWhereFilter(
-                    SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Url", "Action_url", "Signon_realm", "Username", "Username_field", "Password_field", "Scheme", "Decryption_status", "Credential_artifact_value", "Store", "Login_guid"),
+                    SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Url", "Action_url", "Signon_realm", "Username", "Username_field", "Password_field", "Scheme", "Decryption_status", "Credential_artifact_value", "Credential_kind", "Decoded_credential_preview", "Credential_decoder_notes", "Store", "Login_guid"),
                     SearchSql.TimeCondition("Created", "Last_used", "Password_changed")));
                 Tools.ShowQueryOnDataGridView(sfDataGrid1, Helpers.chromeViewerConnectionString, sqlquery, labelItemCount, Console);
                 labelStatus.Text = "All saved login metadata from all browsers";
@@ -4798,19 +5736,197 @@ namespace Browser_Reviewer
                 lblNavegadorLogins.MouseHover += (sender, e) => { lblNavegadorLogins.BackColor = Color.LightBlue; };
                 lblNavegadorLogins.MouseLeave += (sender, e) => { lblNavegadorLogins.BackColor = Color.SteelBlue; };
 
-                lblNavegadorLogins.Click += (sender, e) =>
+                FlowLayoutPanel flwLoginCategories = new FlowLayoutPanel
                 {
-                    string filterCondition = CurrentAndFilter(
-                        SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Url", "Action_url", "Signon_realm", "Username", "Username_field", "Password_field", "Scheme", "Decryption_status", "Credential_artifact_value", "Store", "Login_guid"),
-                        SearchSql.TimeCondition("Created", "Last_used", "Password_changed"));
-                    string sqlquery = BuildLoginSelectQuery($"WHERE Browser = '{navegador}' {filterCondition}");
+                    Name = "flwSubNavegador",
+                    BackColor = Color.Beige,
+                    FlowDirection = FlowDirection.TopDown,
+                    WrapContents = false,
+                    AutoScroll = false,
+                    AutoSize = true,
+                    Height = 200,
+                    Margin = new Padding(0, 4, 0, 4),
+                    Padding = new Padding(4),
+                    Tag = "fullwidth"
+                };
+                flwLoginCategories.Width =
+                    flwMain.ClientSize.Width - flwMain.Padding.Horizontal - flwLoginCategories.Margin.Horizontal;
+
+                flwLoginCategories.SizeChanged += (s, e) =>
+                {
+                    int usable = flwLoginCategories.ClientSize.Width - flwLoginCategories.Padding.Horizontal;
+                    foreach (Control c in flwLoginCategories.Controls)
+                        if ((c.Tag as string) == "fullwidth")
+                            c.Width = Math.Max(0, usable - c.Margin.Horizontal);
+                };
+
+                Label lblAllBrowserLogins = BuildDownloadTypeLabel(
+                    "All Saved Logins",
+                    count,
+                    Helpers.FS,
+                    Resource1.AllHistory.ToBitmap(),
+                    flwLoginCategories);
+                lblAllBrowserLogins.Click += (sender, e) =>
+                {
+                    string sqlquery = BuildLoginsByCategoryQuery(navegador, null);
                     Tools.ShowQueryOnDataGridView(sfDataGrid1, Helpers.chromeViewerConnectionString, sqlquery, labelItemCount, Console);
                     labelStatus.Text = $"Saved login metadata from {navegador}";
+                };
+                flwLoginCategories.Controls.Add(lblAllBrowserLogins);
+
+                foreach (var categoryEntry in GetLoginCategoryCounts(navegador).OrderBy(entry => entry.Key))
+                {
+                    Label lblLoginCategory = BuildDownloadTypeLabel(
+                        categoryEntry.Key,
+                        categoryEntry.Value,
+                        Helpers.FS,
+                        GetLoginCategoryIcon(categoryEntry.Key),
+                        flwLoginCategories);
+                    lblLoginCategory.Click += (sender, e) =>
+                    {
+                        string sqlquery = BuildLoginsByCategoryQuery(navegador, categoryEntry.Key);
+                        Tools.ShowQueryOnDataGridView(sfDataGrid1, Helpers.chromeViewerConnectionString, sqlquery, labelItemCount, Console);
+                        labelStatus.Text = $"{categoryEntry.Key} saved login metadata from {navegador}";
+                    };
+                    flwLoginCategories.Controls.Add(lblLoginCategory);
+                }
+
+                lblNavegadorLogins.Click += (sender, e) =>
+                {
+                    flwLoginCategories.Visible = !flwLoginCategories.Visible;
                 };
 
                 Helpers.loginLabels[navegador] = lblNavegadorLogins;
                 flwMain.Controls.Add(lblNavegadorLogins);
+                flwMain.Controls.Add(flwLoginCategories);
+
+                flwLoginCategories.Visible = false;
             }
+        }
+
+        private Dictionary<string, int> GetLoginCategoryCounts(string browserName)
+        {
+            Dictionary<string, int> counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var row in GetLoginFacetRows(browserName))
+            {
+                string category = ClassifyLoginTarget(row.Url, row.ActionUrl, row.SignonRealm);
+                counts[category] = counts.TryGetValue(category, out int count) ? count + 1 : 1;
+            }
+
+            return counts;
+        }
+
+        private string BuildLoginsByCategoryQuery(string browserName, string? category)
+        {
+            string browser = EscapeSqlLiteral(browserName);
+            string whereClause;
+            if (string.IsNullOrWhiteSpace(category))
+            {
+                whereClause = $"WHERE Browser = '{browser}' {CurrentAndFilter(SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Url", "Action_url", "Signon_realm", "Username", "Username_field", "Password_field", "Scheme", "Decryption_status", "Credential_artifact_value", "Credential_kind", "Decoded_credential_preview", "Credential_decoder_notes", "Store", "Login_guid"), SearchSql.TimeCondition("Created", "Last_used", "Password_changed"))}";
+            }
+            else
+            {
+                List<int> ids = GetLoginFacetRows(browserName)
+                    .Where(row => string.Equals(ClassifyLoginTarget(row.Url, row.ActionUrl, row.SignonRealm), category, StringComparison.OrdinalIgnoreCase))
+                    .Select(row => row.Id)
+                    .ToList();
+
+                whereClause = ids.Count == 0 ? "WHERE 1 = 0" : $"WHERE id IN ({string.Join(",", ids)})";
+            }
+
+            return BuildLoginSelectQuery(whereClause);
+        }
+
+        private List<LoginFacetRow> GetLoginFacetRows(string browserName)
+        {
+            List<LoginFacetRow> rows = new List<LoginFacetRow>();
+            string browser = EscapeSqlLiteral(browserName);
+            string filter = CurrentAndFilter(
+                SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Url", "Action_url", "Signon_realm", "Username", "Username_field", "Password_field", "Scheme", "Decryption_status", "Credential_artifact_value", "Credential_kind", "Decoded_credential_preview", "Credential_decoder_notes", "Store", "Login_guid"),
+                SearchSql.TimeCondition("Created", "Last_used", "Password_changed"));
+
+            string query = $@"
+                SELECT id, Url, Action_url, Signon_realm
+                FROM saved_logins_data
+                WHERE Browser = '{browser}' {filter};";
+
+            using SQLiteConnection connection = new SQLiteConnection(Helpers.chromeViewerConnectionString);
+            connection.Open();
+            using SQLiteCommand command = new SQLiteCommand(query, connection);
+            SearchSql.AddParameters(command);
+            using SQLiteDataReader reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                rows.Add(new LoginFacetRow
+                {
+                    Id = reader.GetInt32(0),
+                    Url = reader.IsDBNull(1) ? null : reader.GetString(1),
+                    ActionUrl = reader.IsDBNull(2) ? null : reader.GetString(2),
+                    SignonRealm = reader.IsDBNull(3) ? null : reader.GetString(3)
+                });
+            }
+
+            return rows;
+        }
+
+        private static string ClassifyLoginTarget(params string?[] candidates)
+        {
+            foreach (string? candidate in candidates)
+            {
+                string value = (candidate ?? string.Empty).Trim();
+                if (string.IsNullOrWhiteSpace(value))
+                    continue;
+
+                string historyCategory = MyTools.Evaluatecategory(value);
+                if (!string.Equals(historyCategory, "Other", StringComparison.OrdinalIgnoreCase) &&
+                    !string.Equals(historyCategory, "Unknown", StringComparison.OrdinalIgnoreCase))
+                {
+                    return historyCategory;
+                }
+
+                string domain = ExtractLoginBaseDomain(value);
+                if (!string.Equals(domain, "Unknown", StringComparison.OrdinalIgnoreCase))
+                    return domain;
+            }
+
+            return "Unknown";
+        }
+
+        private static string ExtractLoginBaseDomain(string value)
+        {
+            string candidate = value.Trim();
+            if (string.IsNullOrWhiteSpace(candidate))
+                return "Unknown";
+
+            if (!candidate.Contains("://") && candidate.Contains('.'))
+                candidate = $"https://{candidate.TrimStart('.')}";
+
+            try
+            {
+                Uri uri = new Uri(candidate);
+                return GetCookieBaseDomain(uri.Host.ToLowerInvariant());
+            }
+            catch
+            {
+                return "Unknown";
+            }
+        }
+
+        private Image GetLoginCategoryIcon(string category)
+        {
+            if (category.Contains('.'))
+                return Resource1.url_icon;
+
+            return GetHistoryCategoryIcon(category);
+        }
+
+        private class LoginFacetRow
+        {
+            public int Id { get; set; }
+            public string? Url { get; set; }
+            public string? ActionUrl { get; set; }
+            public string? SignonRealm { get; set; }
         }
 
         private string BuildLoginSelectQuery(string whereClause)
@@ -4828,6 +5944,7 @@ namespace Browser_Reviewer
                     {passwordChangedExpr} AS Password_changed,
                     Is_blacklisted, Is_federated, Password_present, Encrypted_password_sha256,
                     Encrypted_password_size, Decryption_status, Credential_artifact_value,
+                    Credential_kind, Decoded_credential_preview, Credential_decoder_notes,
                     Store, Login_guid, File, Label, Comment
                 FROM saved_logins_data
                 {whereClause};";
@@ -4835,79 +5952,15 @@ namespace Browser_Reviewer
 
         private void AddLocalStorageLabels(FlowLayoutPanel flwMain, Dictionary<string, int> browsersWithLocalStorage)
         {
-            Font fm = Helpers.FM;
-
-            Label lblAllLocalStorageButton = new Label()
-            {
-                BackColor = Color.White,
-                Font = new Font(fm, FontStyle.Bold),
-                ForeColor = Color.Black,
-                AutoSize = false,
-                Height = 48,
-                Margin = new Padding(3, 1, 3, 1),
-                Padding = new Padding(12, 3, 0, 3),
-                Text = $"All Local Storage {browsersWithLocalStorage.Values.Sum()} hits",
-                TextAlign = ContentAlignment.MiddleCenter,
-                Tag = "fullwidth"
-            };
-
-            lblAllLocalStorageButton.Width =
-                flwMain.ClientSize.Width - flwMain.Padding.Horizontal - lblAllLocalStorageButton.Margin.Horizontal;
-
-            lblAllLocalStorageButton.Click += (sender, e) =>
-            {
-                string sqlquery = BuildLocalStorageSelectQuery(CurrentWhereFilter(
-                    SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Origin", "Host", "Storage_key", "Value_preview", "Value_sha256", "Source_kind", "Source_file", "Parser_notes"),
-                    SearchSql.TimeCondition("Created", "Modified", "LastAccessed")));
-                Tools.ShowQueryOnDataGridView(sfDataGrid1, Helpers.chromeViewerConnectionString, sqlquery, labelItemCount, Console);
-                labelStatus.Text = "All local storage from all browsers";
-            };
-
-            lblAllLocalStorageButton.MouseHover += (sender, e) => { lblAllLocalStorageButton.BackColor = Color.LightBlue; };
-            lblAllLocalStorageButton.MouseLeave += (sender, e) => { lblAllLocalStorageButton.BackColor = Color.White; };
-            flwMain.Controls.Add(lblAllLocalStorageButton);
-
-            foreach (var entry in browsersWithLocalStorage.OrderBy(b => b.Key))
-            {
-                string navegador = entry.Key;
-                int count = entry.Value;
-                Image icono = GetBrowserIcon(navegador);
-
-                Label lblNavegadorLocalStorage = new Label()
-                {
-                    BackColor = Color.SteelBlue,
-                    Font = fm,
-                    ForeColor = Color.White,
-                    AutoSize = false,
-                    Height = 48,
-                    Image = icono,
-                    ImageAlign = ContentAlignment.MiddleLeft,
-                    Margin = new Padding(3, 1, 3, 1),
-                    Padding = new Padding(12, 3, 0, 3),
-                    Text = $"{navegador} {count} hits",
-                    TextAlign = ContentAlignment.MiddleCenter,
-                    Tag = "fullwidth"
-                };
-
-                lblNavegadorLocalStorage.Width =
-                    flwMain.ClientSize.Width - flwMain.Padding.Horizontal - lblNavegadorLocalStorage.Margin.Horizontal;
-
-                lblNavegadorLocalStorage.MouseHover += (sender, e) => { lblNavegadorLocalStorage.BackColor = Color.LightBlue; };
-                lblNavegadorLocalStorage.MouseLeave += (sender, e) => { lblNavegadorLocalStorage.BackColor = Color.SteelBlue; };
-
-                lblNavegadorLocalStorage.Click += (sender, e) =>
-                {
-                    string filterCondition = CurrentAndFilter(
-                        SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Origin", "Host", "Storage_key", "Value_preview", "Value_sha256", "Source_kind", "Source_file", "Parser_notes"),
-                        SearchSql.TimeCondition("Created", "Modified", "LastAccessed"));
-                    string sqlquery = BuildLocalStorageSelectQuery($"WHERE Browser = '{navegador}' {filterCondition}");
-                    Tools.ShowQueryOnDataGridView(sfDataGrid1, Helpers.chromeViewerConnectionString, sqlquery, labelItemCount, Console);
-                    labelStatus.Text = $"Local storage from {navegador}";
-                };
-
-                Helpers.localStorageLabels[navegador] = lblNavegadorLocalStorage;
-                flwMain.Controls.Add(lblNavegadorLocalStorage);
-            }
+            AddWebStorageLabels(
+                flwMain,
+                browsersWithLocalStorage,
+                Helpers.localStorageLabels,
+                "All Local Storage",
+                "Local storage from",
+                "All local storage from all browsers",
+                "local_storage_data",
+                BuildLocalStorageSelectQuery);
         }
 
         private string BuildLocalStorageSelectQuery(string whereClause)
@@ -4919,7 +5972,7 @@ namespace Browser_Reviewer
             return $@"
                 SELECT
                     id, Artifact_type, Potential_activity, Browser, Origin, Host, Storage_key, Value_preview,
-                    Value_size, Value_sha256, Source_kind, Source_file,
+                    Value_size, Value_sha256, Value_kind, Decoded_value_preview, Decoder_notes, Source_kind, Source_file,
                     {createdExpr} AS Created,
                     {modifiedExpr} AS Modified,
                     {accessedExpr} AS LastAccessed,
@@ -4937,6 +5990,7 @@ namespace Browser_Reviewer
                 "All Session Storage",
                 "Session storage from",
                 "All session storage from all browsers",
+                "session_storage_data",
                 BuildSessionStorageSelectQuery);
         }
 
@@ -4949,6 +6003,7 @@ namespace Browser_Reviewer
                 "All IndexedDB",
                 "IndexedDB from",
                 "All IndexedDB data from all browsers",
+                "indexeddb_data",
                 BuildIndexedDbSelectQuery);
         }
 
@@ -4959,6 +6014,7 @@ namespace Browser_Reviewer
             string allText,
             string browserStatusPrefix,
             string allStatusText,
+            string tableName,
             Func<string, string> queryBuilder)
         {
             Font fm = Helpers.FM;
@@ -4983,7 +6039,7 @@ namespace Browser_Reviewer
             lblAllButton.Click += (sender, e) =>
             {
                 string sqlquery = queryBuilder(CurrentWhereFilter(
-                    SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Origin", "Host", "Storage_key", "Value_preview", "Value_sha256", "Source_kind", "Source_file", "Parser_notes"),
+                    SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Origin", "Host", "Storage_key", "Value_preview", "Value_kind", "Decoded_value_preview", "Decoder_notes", "Value_sha256", "Source_kind", "Source_file", "Parser_notes"),
                     SearchSql.TimeCondition("Created", "Modified", "LastAccessed")));
                 Tools.ShowQueryOnDataGridView(sfDataGrid1, Helpers.chromeViewerConnectionString, sqlquery, labelItemCount, Console);
                 labelStatus.Text = allStatusText;
@@ -5021,19 +6077,185 @@ namespace Browser_Reviewer
                 lblBrowser.MouseHover += (sender, e) => { lblBrowser.BackColor = Color.LightBlue; };
                 lblBrowser.MouseLeave += (sender, e) => { lblBrowser.BackColor = Color.SteelBlue; };
 
-                lblBrowser.Click += (sender, e) =>
+                FlowLayoutPanel flwStorageCategories = new FlowLayoutPanel
                 {
-                    string filterCondition = CurrentAndFilter(
-                        SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Origin", "Host", "Storage_key", "Value_preview", "Value_sha256", "Source_kind", "Source_file", "Parser_notes"),
-                        SearchSql.TimeCondition("Created", "Modified", "LastAccessed"));
-                    string sqlquery = queryBuilder($"WHERE Browser = '{navegador}' {filterCondition}");
+                    Name = "flwSubNavegador",
+                    BackColor = Color.Beige,
+                    FlowDirection = FlowDirection.TopDown,
+                    WrapContents = false,
+                    AutoScroll = false,
+                    AutoSize = true,
+                    Height = 200,
+                    Margin = new Padding(0, 4, 0, 4),
+                    Padding = new Padding(4),
+                    Tag = "fullwidth"
+                };
+                flwStorageCategories.Width =
+                    flwMain.ClientSize.Width - flwMain.Padding.Horizontal - flwStorageCategories.Margin.Horizontal;
+
+                flwStorageCategories.SizeChanged += (s, e) =>
+                {
+                    int usable = flwStorageCategories.ClientSize.Width - flwStorageCategories.Padding.Horizontal;
+                    foreach (Control c in flwStorageCategories.Controls)
+                        if ((c.Tag as string) == "fullwidth")
+                            c.Width = Math.Max(0, usable - c.Margin.Horizontal);
+                };
+
+                Label lblAllBrowserStorage = BuildDownloadTypeLabel(
+                    allText,
+                    count,
+                    Helpers.FS,
+                    Resource1.AllHistory.ToBitmap(),
+                    flwStorageCategories);
+                lblAllBrowserStorage.Click += (sender, e) =>
+                {
+                    string sqlquery = BuildStorageByCategoryQuery(tableName, navegador, null, queryBuilder);
                     Tools.ShowQueryOnDataGridView(sfDataGrid1, Helpers.chromeViewerConnectionString, sqlquery, labelItemCount, Console);
                     labelStatus.Text = $"{browserStatusPrefix} {navegador}";
+                };
+                flwStorageCategories.Controls.Add(lblAllBrowserStorage);
+
+                foreach (var categoryEntry in GetStorageCategoryCounts(tableName, navegador).OrderBy(entry => entry.Key))
+                {
+                    Label lblStorageCategory = BuildDownloadTypeLabel(
+                        categoryEntry.Key,
+                        categoryEntry.Value,
+                        Helpers.FS,
+                        GetStorageCategoryIcon(categoryEntry.Key),
+                        flwStorageCategories);
+                    lblStorageCategory.Click += (sender, e) =>
+                    {
+                        string sqlquery = BuildStorageByCategoryQuery(tableName, navegador, categoryEntry.Key, queryBuilder);
+                        Tools.ShowQueryOnDataGridView(sfDataGrid1, Helpers.chromeViewerConnectionString, sqlquery, labelItemCount, Console);
+                        labelStatus.Text = $"{categoryEntry.Key} {browserStatusPrefix.ToLowerInvariant()} {navegador}";
+                    };
+                    flwStorageCategories.Controls.Add(lblStorageCategory);
+                }
+
+                lblBrowser.Click += (sender, e) =>
+                {
+                    flwStorageCategories.Visible = !flwStorageCategories.Visible;
                 };
 
                 labelStore[navegador] = lblBrowser;
                 flwMain.Controls.Add(lblBrowser);
+                flwMain.Controls.Add(flwStorageCategories);
+
+                flwStorageCategories.Visible = false;
             }
+        }
+
+        private Dictionary<string, int> GetStorageCategoryCounts(string tableName, string browserName)
+        {
+            Dictionary<string, int> counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var row in GetStorageFacetRows(tableName, browserName))
+            {
+                string category = ClassifyStorageTarget(row.Origin, row.Host);
+                counts[category] = counts.TryGetValue(category, out int count) ? count + 1 : 1;
+            }
+
+            return counts;
+        }
+
+        private string BuildStorageByCategoryQuery(string tableName, string browserName, string? category, Func<string, string> queryBuilder)
+        {
+            string browser = EscapeSqlLiteral(browserName);
+            string whereClause;
+            if (string.IsNullOrWhiteSpace(category))
+            {
+                whereClause = $"WHERE Browser = '{browser}' {CurrentAndFilter(SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Origin", "Host", "Storage_key", "Value_preview", "Value_kind", "Decoded_value_preview", "Decoder_notes", "Value_sha256", "Source_kind", "Source_file", "Parser_notes"), SearchSql.TimeCondition("Created", "Modified", "LastAccessed"))}";
+            }
+            else
+            {
+                List<int> ids = GetStorageFacetRows(tableName, browserName)
+                    .Where(row => string.Equals(ClassifyStorageTarget(row.Origin, row.Host), category, StringComparison.OrdinalIgnoreCase))
+                    .Select(row => row.Id)
+                    .ToList();
+
+                whereClause = ids.Count == 0 ? "WHERE 1 = 0" : $"WHERE id IN ({string.Join(",", ids)})";
+            }
+
+            return queryBuilder(whereClause);
+        }
+
+        private List<StorageFacetRow> GetStorageFacetRows(string tableName, string browserName)
+        {
+            List<StorageFacetRow> rows = new List<StorageFacetRow>();
+            string browser = EscapeSqlLiteral(browserName);
+            string filter = CurrentAndFilter(
+                SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Origin", "Host", "Storage_key", "Value_preview", "Value_kind", "Decoded_value_preview", "Decoder_notes", "Value_sha256", "Source_kind", "Source_file", "Parser_notes"),
+                SearchSql.TimeCondition("Created", "Modified", "LastAccessed"));
+
+            string query = $@"
+                SELECT id, Origin, Host
+                FROM {tableName}
+                WHERE Browser = '{browser}' {filter};";
+
+            using SQLiteConnection connection = new SQLiteConnection(Helpers.chromeViewerConnectionString);
+            connection.Open();
+            using SQLiteCommand command = new SQLiteCommand(query, connection);
+            SearchSql.AddParameters(command);
+            using SQLiteDataReader reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                rows.Add(new StorageFacetRow
+                {
+                    Id = reader.GetInt32(0),
+                    Origin = reader.IsDBNull(1) ? null : reader.GetString(1),
+                    Host = reader.IsDBNull(2) ? null : reader.GetString(2)
+                });
+            }
+
+            return rows;
+        }
+
+        private static string ClassifyStorageTarget(string? origin, string? host)
+        {
+            string originValue = (origin ?? string.Empty).Trim();
+            if (!string.IsNullOrWhiteSpace(originValue))
+            {
+                string historyCategory = MyTools.Evaluatecategory(originValue);
+                if (!string.Equals(historyCategory, "Other", StringComparison.OrdinalIgnoreCase) &&
+                    !string.Equals(historyCategory, "Unknown", StringComparison.OrdinalIgnoreCase))
+                {
+                    return historyCategory;
+                }
+
+                string domain = ExtractLoginBaseDomain(originValue);
+                if (!string.Equals(domain, "Unknown", StringComparison.OrdinalIgnoreCase))
+                    return domain;
+            }
+
+            string normalizedHost = NormalizeCookieHost(host);
+            if (!string.IsNullOrWhiteSpace(normalizedHost))
+            {
+                string historyCategory = MyTools.Evaluatecategory($"https://{normalizedHost}/");
+                if (!string.Equals(historyCategory, "Other", StringComparison.OrdinalIgnoreCase) &&
+                    !string.Equals(historyCategory, "Unknown", StringComparison.OrdinalIgnoreCase))
+                {
+                    return historyCategory;
+                }
+
+                return GetCookieBaseDomain(normalizedHost);
+            }
+
+            return "Unknown";
+        }
+
+        private Image GetStorageCategoryIcon(string category)
+        {
+            if (category.Contains('.'))
+                return Resource1.url_icon;
+
+            return GetHistoryCategoryIcon(category);
+        }
+
+        private class StorageFacetRow
+        {
+            public int Id { get; set; }
+            public string? Origin { get; set; }
+            public string? Host { get; set; }
         }
 
         private string BuildSessionStorageSelectQuery(string whereClause)
@@ -5055,7 +6277,7 @@ namespace Browser_Reviewer
             return $@"
                 SELECT
                     id, Artifact_type, Potential_activity, Browser, Origin, Host, Storage_key, Value_preview,
-                    Value_size, Value_sha256, Source_kind, Source_file,
+                    Value_size, Value_sha256, Value_kind, Decoded_value_preview, Decoder_notes, Source_kind, Source_file,
                     {createdExpr} AS Created,
                     {modifiedExpr} AS Modified,
                     {accessedExpr} AS LastAccessed,
@@ -5077,20 +6299,66 @@ namespace Browser_Reviewer
 
             try
             {
-                var node = sfDataGrid1.GetRecordEntryAtRowIndex(e.RowIndex);
-                if (node is not Syncfusion.Data.RecordEntry record || record.Data is not DataRowView rowView)
+                DataRowView? rowView = GetGridRowView(e);
+                if (rowView == null)
                     return false;
 
                 if (rowView.DataView?.Table == null || !rowView.DataView.Table.Columns.Contains(e.Column.MappingName))
                     return false;
 
                 string value = rowView[e.Column.MappingName]?.ToString() ?? string.Empty;
-                return Regex.IsMatch(value, Helpers.searchTerm, RegexOptions.IgnoreCase | RegexOptions.Singleline);
+                return TextMatchesSearch(value);
             }
             catch
             {
                 return false;
             }
+        }
+
+
+        private bool GridRowMatchesSearch(QueryCellStyleEventArgs e)
+        {
+            if (string.IsNullOrWhiteSpace(Helpers.searchTerm))
+                return false;
+
+            try
+            {
+                DataRowView? rowView = GetGridRowView(e);
+                if (rowView?.DataView?.Table == null)
+                    return false;
+
+                foreach (DataColumn column in rowView.DataView.Table.Columns)
+                {
+                    string value = rowView[column.ColumnName]?.ToString() ?? string.Empty;
+                    if (TextMatchesSearch(value))
+                        return true;
+                }
+            }
+            catch
+            {
+                return false;
+            }
+
+            return false;
+        }
+
+
+        private DataRowView? GetGridRowView(QueryCellStyleEventArgs e)
+        {
+            var node = sfDataGrid1.GetRecordEntryAtRowIndex(e.RowIndex);
+            return node is Syncfusion.Data.RecordEntry record ? record.Data as DataRowView : null;
+        }
+
+
+        private bool TextMatchesSearch(string value)
+        {
+            if (string.IsNullOrEmpty(value) || string.IsNullOrWhiteSpace(Helpers.searchTerm))
+                return false;
+
+            if (Helpers.searchTermRegExp)
+                return Regex.IsMatch(value, Helpers.searchTerm, RegexOptions.IgnoreCase | RegexOptions.Singleline);
+
+            return value.IndexOf(Helpers.searchTerm, StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
 
@@ -5483,7 +6751,7 @@ namespace Browser_Reviewer
             }
 
 
-            searchCondition = SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Host", "Name", "Value", "Path");
+            searchCondition = SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Host", "Name", "Value", "ValueKind", "DecodedValuePreview", "DecoderNotes", "Path");
             string cookiesWhere = SearchSql.Where(searchCondition, SearchSql.TimeCondition("Created", "Expires", "LastAccessed"), SearchSql.LabelCondition());
 
             string sqlqueryBrowserCookiesMenu = $@"
@@ -5515,7 +6783,7 @@ namespace Browser_Reviewer
             }
 
 
-            searchCondition = SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Url", "Host", "ContentType", "Server", "CacheFile", "CacheKey");
+            searchCondition = SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Url", "Host", "ContentType", "CacheType", "Server", "CacheFile", "CacheKey", "BodyPreview", "BodyKind", "DecodedBodyPreview", "BodyDecoderNotes", "DetectedFileType", "DetectedExtension");
             string cacheWhere = SearchSql.Where(searchCondition, SearchSql.TimeCondition("Created", "Modified", "LastAccessed"), SearchSql.LabelCondition());
 
             string sqlqueryBrowserCacheMenu = $@"
@@ -5610,7 +6878,7 @@ namespace Browser_Reviewer
                 }
             }
 
-            searchCondition = SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Url", "Action_url", "Signon_realm", "Username", "Username_field", "Password_field", "Scheme", "Decryption_status", "Credential_artifact_value", "Store", "Login_guid");
+            searchCondition = SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Url", "Action_url", "Signon_realm", "Username", "Username_field", "Password_field", "Scheme", "Decryption_status", "Credential_artifact_value", "Credential_kind", "Decoded_credential_preview", "Credential_decoder_notes", "Store", "Login_guid");
             string loginsWhere = SearchSql.Where(searchCondition, SearchSql.TimeCondition("Created", "Last_used", "Password_changed"), SearchSql.LabelCondition());
 
             string sqlqueryBrowserLoginsMenu = $@"
@@ -5641,7 +6909,7 @@ namespace Browser_Reviewer
                 }
             }
 
-            searchCondition = SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Origin", "Host", "Storage_key", "Value_preview", "Value_sha256", "Source_kind", "Source_file", "Parser_notes");
+            searchCondition = SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Origin", "Host", "Storage_key", "Value_preview", "Value_kind", "Decoded_value_preview", "Decoder_notes", "Value_sha256", "Source_kind", "Source_file", "Parser_notes");
             string localStorageWhere = SearchSql.Where(searchCondition, SearchSql.TimeCondition("Created", "Modified", "LastAccessed"), SearchSql.LabelCondition());
 
             string sqlqueryBrowserLocalStorageMenu = $@"
@@ -5815,10 +7083,11 @@ namespace Browser_Reviewer
         private void HighlightPlainText(string text, Color highlightColor)
         {
             int startIndex = 0;
+            string content = richTextBox1.Text;
 
             while (startIndex < richTextBox1.TextLength)
             {
-                int wordStartIndex = richTextBox1.Find(text, startIndex, RichTextBoxFinds.None);
+                int wordStartIndex = content.IndexOf(text, startIndex, StringComparison.OrdinalIgnoreCase);
                 if (wordStartIndex != -1)
                 {
                     richTextBox1.SelectionStart = wordStartIndex;

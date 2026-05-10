@@ -9,6 +9,7 @@ using System.Security.AccessControl;
 using System.Security.Principal;
 using System.Text.RegularExpressions;
 using System.Security.Cryptography;
+using System.IO.Compression;
 using Syncfusion.WinForms.GridCommon.ScrollAxis;
 using static System.Runtime.InteropServices.JavaScript.JSType;
 using System;
@@ -30,6 +31,26 @@ namespace Browser_Reviewer
         private static readonly object ProcessedSourcesLock = new object();
         private static readonly HashSet<string> ProcessedSources = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private static readonly Dictionary<string, int> SkippedProcessedSourceCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+        private struct DATA_BLOB
+        {
+            public int cbData;
+            public IntPtr pbData;
+        }
+
+        [DllImport("crypt32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+        private static extern bool CryptUnprotectData(
+            ref DATA_BLOB pDataIn,
+            IntPtr ppszDataDescr,
+            IntPtr pOptionalEntropy,
+            IntPtr pvReserved,
+            IntPtr pPromptStruct,
+            int dwFlags,
+            ref DATA_BLOB pDataOut);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern IntPtr LocalFree(IntPtr hMem);
 
         [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
         public struct WIN32_FIND_DATA
@@ -837,6 +858,9 @@ namespace Browser_Reviewer
                                                 SourceScheme TEXT,
                                                 SourcePort INTEGER,
                                                 IsEncrypted INTEGER,
+                                                ValueKind TEXT,
+                                                DecodedValuePreview TEXT,
+                                                DecoderNotes TEXT,
                                                 File TEXT,
                                                 Label TEXT,
                                                 Comment TEXT,
@@ -866,6 +890,9 @@ namespace Browser_Reviewer
                                                 BodySha256 TEXT,
                                                 BodyStored INTEGER DEFAULT 0,
                                                 BodyPreview TEXT,
+                                                BodyKind TEXT,
+                                                DecodedBodyPreview TEXT,
+                                                BodyDecoderNotes TEXT,
                                                 DetectedFileType TEXT,
                                                 DetectedExtension TEXT,
                                                 File TEXT,
@@ -946,6 +973,9 @@ namespace Browser_Reviewer
                                                 Encrypted_password_size INTEGER,
                                                 Decryption_status TEXT,
                                                 Credential_artifact_value TEXT,
+                                                Credential_kind TEXT,
+                                                Decoded_credential_preview TEXT,
+                                                Credential_decoder_notes TEXT,
                                                 Store TEXT,
                                                 Login_guid TEXT,
                                                 File TEXT,
@@ -965,6 +995,9 @@ namespace Browser_Reviewer
                                                 Value_preview TEXT,
                                                 Value_size INTEGER,
                                                 Value_sha256 TEXT,
+                                                Value_kind TEXT,
+                                                Decoded_value_preview TEXT,
+                                                Decoder_notes TEXT,
                                                 Source_kind TEXT,
                                                 Source_file TEXT,
                                                 Created DATETIME,
@@ -988,6 +1021,9 @@ namespace Browser_Reviewer
                                                 Value_preview TEXT,
                                                 Value_size INTEGER,
                                                 Value_sha256 TEXT,
+                                                Value_kind TEXT,
+                                                Decoded_value_preview TEXT,
+                                                Decoder_notes TEXT,
                                                 Source_kind TEXT,
                                                 Source_file TEXT,
                                                 Created DATETIME,
@@ -1011,6 +1047,9 @@ namespace Browser_Reviewer
                                                 Value_preview TEXT,
                                                 Value_size INTEGER,
                                                 Value_sha256 TEXT,
+                                                Value_kind TEXT,
+                                                Decoded_value_preview TEXT,
+                                                Decoder_notes TEXT,
                                                 Source_kind TEXT,
                                                 Source_file TEXT,
                                                 Created DATETIME,
@@ -1133,7 +1172,47 @@ namespace Browser_Reviewer
                     command.ExecuteNonQuery();
                 }
 
+                EnsureDecodedValueColumns(connection);
+
             }
+        }
+
+        private static void EnsureDecodedValueColumns(SQLiteConnection connection, SQLiteTransaction? transaction = null)
+        {
+            EnsureColumn(connection, transaction, "cookies_data", "ValueKind", "TEXT");
+            EnsureColumn(connection, transaction, "cookies_data", "DecodedValuePreview", "TEXT");
+            EnsureColumn(connection, transaction, "cookies_data", "DecoderNotes", "TEXT");
+
+            EnsureColumn(connection, transaction, "cache_data", "BodyKind", "TEXT");
+            EnsureColumn(connection, transaction, "cache_data", "DecodedBodyPreview", "TEXT");
+            EnsureColumn(connection, transaction, "cache_data", "BodyDecoderNotes", "TEXT");
+
+            EnsureColumn(connection, transaction, "saved_logins_data", "Credential_kind", "TEXT");
+            EnsureColumn(connection, transaction, "saved_logins_data", "Decoded_credential_preview", "TEXT");
+            EnsureColumn(connection, transaction, "saved_logins_data", "Credential_decoder_notes", "TEXT");
+
+            foreach (string tableName in new[] { "local_storage_data", "session_storage_data", "indexeddb_data" })
+            {
+                EnsureColumn(connection, transaction, tableName, "Value_kind", "TEXT");
+                EnsureColumn(connection, transaction, tableName, "Decoded_value_preview", "TEXT");
+                EnsureColumn(connection, transaction, tableName, "Decoder_notes", "TEXT");
+            }
+        }
+
+        private static void EnsureColumn(SQLiteConnection connection, SQLiteTransaction? transaction, string tableName, string columnName, string columnType)
+        {
+            using (SQLiteCommand checkCommand = new SQLiteCommand($"PRAGMA table_info({tableName});", connection, transaction))
+            using (SQLiteDataReader reader = checkCommand.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    if (string.Equals(reader["name"]?.ToString(), columnName, StringComparison.OrdinalIgnoreCase))
+                        return;
+                }
+            }
+
+            using SQLiteCommand alterCommand = new SQLiteCommand($"ALTER TABLE {tableName} ADD COLUMN {columnName} {columnType};", connection, transaction);
+            alterCommand.ExecuteNonQuery();
         }
 
         private static void EnsureProcessingSummaryTables(SQLiteConnection connection, SQLiteTransaction? transaction = null)
@@ -2378,6 +2457,11 @@ namespace Browser_Reviewer
                 return "Local Files";
             }
 
+            string? urlhausCategory = UrlhausIntel.Categorize(url);
+            if (!string.IsNullOrWhiteSpace(urlhausCategory))
+            {
+                return urlhausCategory;
+            }
 
             string? domain = GetDomainFromUrl(url);
 
@@ -2398,12 +2482,16 @@ namespace Browser_Reviewer
                     return category.Key;
                 }
             }
-            
-            foreach (var category in CategoryData.categoryDomains)
+
+            var domainCandidates = CategoryData.categoryDomains
+                .SelectMany(category => category.Value.Select(candidate => new { Category = category.Key, Domain = candidate }))
+                .OrderByDescending(candidate => candidate.Domain.Length);
+
+            foreach (var candidate in domainCandidates)
             {
-                if (category.Value.Any(d => domain.EndsWith($".{d}", StringComparison.OrdinalIgnoreCase)))
+                if (domain.EndsWith($".{candidate.Domain}", StringComparison.OrdinalIgnoreCase))
                 {
-                    return category.Key;
+                    return candidate.Category;
                 }
             }
 
@@ -3037,20 +3125,24 @@ namespace Browser_Reviewer
                 string searchCondition = tableName == "firefox_results"
                     ? SearchSql.TextCondition("Artifact_type", "Potential_activity", "Navigation_context", "User_action_likelihood", "Browser", "Category", "Url", "Title", "Transition")
                     : SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Category", "Url", "Title");
-                string categoryCondition = string.IsNullOrEmpty(categoria) ? string.Empty : "Category = @Category";
+                string categoryCondition = tableName == "history_union"
+                    ? string.Empty
+                    : BuildHistoryCategoryCondition(connection, tableName, categoria, navegador);
                 string whereClause = SearchSql.Where("Browser = @Browser", categoryCondition, searchCondition, SearchSql.TimeCondition("Visit_time", "Last_visit_time"), SearchSql.LabelCondition());
 
                 if (tableName == "history_union")
                 {
+                    string firefoxCategoryCondition = BuildHistoryCategoryCondition(connection, "firefox_results", categoria, navegador);
+                    string chromiumCategoryCondition = BuildHistoryCategoryCondition(connection, "results", categoria, navegador);
                     string firefoxWhereClause = SearchSql.Where(
                         "Browser = @Browser",
-                        categoryCondition,
+                        firefoxCategoryCondition,
                         SearchSql.TextCondition("Artifact_type", "Potential_activity", "Navigation_context", "User_action_likelihood", "Browser", "Category", "Url", "Title", "Transition"),
                         SearchSql.TimeCondition("Visit_time", "Last_visit_time"),
                         SearchSql.LabelCondition());
                     string chromiumWhereClause = SearchSql.Where(
                         "Browser = @Browser",
-                        categoryCondition,
+                        chromiumCategoryCondition,
                         SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Category", "Url", "Title"),
                         SearchSql.TimeCondition("Visit_time", "Last_visit_time"),
                         SearchSql.LabelCondition());
@@ -3093,11 +3185,6 @@ namespace Browser_Reviewer
                 using (SQLiteCommand command = new SQLiteCommand(query, connection))
                 {
                     command.Parameters.AddWithValue("@Browser", navegador);
-
-                    if (!string.IsNullOrEmpty(categoria))
-                    {
-                        command.Parameters.AddWithValue("@Category", categoria);
-                    }
 
                     SearchSql.AddParameters(command);
 
@@ -3260,6 +3347,46 @@ namespace Browser_Reviewer
             }
 
             return browsersWithDownloads;
+        }
+
+        private static string BuildHistoryCategoryCondition(SQLiteConnection connection, string tableName, string? categoria, string navegador)
+        {
+            if (string.IsNullOrWhiteSpace(categoria))
+                return string.Empty;
+
+            if (tableName == "history_union")
+                return string.Empty;
+
+            List<int> ids = GetHistoryIdsForCategory(connection, tableName, categoria, navegador);
+            return ids.Count == 0 ? "1 = 0" : $"id IN ({string.Join(",", ids)})";
+        }
+
+        private static List<int> GetHistoryIdsForCategory(SQLiteConnection connection, string tableName, string categoria, string navegador)
+        {
+            List<int> ids = new List<int>();
+            string query = $@"
+                SELECT id, Url
+                FROM {tableName}
+                {SearchSql.Where(
+                    "Browser = @Browser",
+                    tableName == "firefox_results"
+                        ? SearchSql.TextCondition("Artifact_type", "Potential_activity", "Navigation_context", "User_action_likelihood", "Browser", "Category", "Url", "Title", "Transition")
+                        : SearchSql.TextCondition("Artifact_type", "Potential_activity", "Browser", "Category", "Url", "Title"),
+                    SearchSql.TimeCondition("Visit_time", "Last_visit_time"),
+                    SearchSql.LabelCondition())};";
+
+            using SQLiteCommand command = new SQLiteCommand(query, connection);
+            command.Parameters.AddWithValue("@Browser", navegador);
+            SearchSql.AddParameters(command);
+            using SQLiteDataReader reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                string url = reader.IsDBNull(1) ? string.Empty : reader.GetString(1);
+                if (string.Equals(Evaluatecategory(url), categoria, StringComparison.OrdinalIgnoreCase))
+                    ids.Add(reader.GetInt32(0));
+            }
+
+            return ids;
         }
 
 
@@ -3988,6 +4115,498 @@ namespace Browser_Reviewer
             return cleaned.Length > 800 ? cleaned.Substring(0, 800) : cleaned;
         }
 
+        private sealed class DecodedValueInfo
+        {
+            public string Kind { get; set; } = "Unknown";
+            public string? Preview { get; set; }
+            public string? Notes { get; set; }
+        }
+
+        private static DecodedValueInfo InspectDecodedValue(string? value, byte[]? rawBytes = null, string? context = null, string? profilePath = null, string? associatedData = null)
+        {
+            byte[] bytes = rawBytes ?? (value == null ? Array.Empty<byte>() : Encoding.UTF8.GetBytes(value));
+            string text = value ?? string.Empty;
+
+            if (bytes.Length == 0 && string.IsNullOrWhiteSpace(text))
+                return new DecodedValueInfo { Kind = "Empty", Notes = "No value present." };
+
+            if (context?.Contains("firefox-nss", StringComparison.OrdinalIgnoreCase) == true)
+            {
+                return new DecodedValueInfo
+                {
+                    Kind = "Firefox NSS encrypted credential",
+                    Notes = "Stored in Firefox logins.json and encrypted with NSS keys from key4.db/key3.db. Decryption requires the profile NSS key database and master password state."
+                };
+            }
+
+            if (bytes.Length > 0 && IsChromiumEncryptedBlob(bytes))
+            {
+                DecodedValueInfo chromium = TryDecryptChromiumBlob(bytes, profilePath, associatedData);
+                if (!string.IsNullOrWhiteSpace(chromium.Preview))
+                    return chromium;
+
+                return chromium;
+            }
+
+            if (context?.Contains("dpapi", StringComparison.OrdinalIgnoreCase) == true)
+            {
+                DecodedValueInfo dpapi = TryDecryptDpapiBlob(bytes);
+                if (!string.IsNullOrWhiteSpace(dpapi.Preview))
+                    return dpapi;
+            }
+
+            DecodedValueInfo? compressed = TryDecodeCompressed(bytes);
+            if (compressed != null)
+                return compressed;
+
+            DecodedValueInfo? jwt = TryDecodeJwt(text);
+            if (jwt != null)
+                return jwt;
+
+            DecodedValueInfo? urlDecoded = TryDecodeUrlEncoded(text);
+            if (urlDecoded != null)
+                return urlDecoded;
+
+            DecodedValueInfo? base64 = TryDecodeBase64(text);
+            if (base64 != null)
+                return base64;
+
+            DecodedValueInfo? hex = TryDecodeHex(text);
+            if (hex != null)
+                return hex;
+
+            if (LooksLikeJson(text))
+                return new DecodedValueInfo { Kind = "JSON", Preview = TrimDecodedPreview(PrettyJson(text)), Notes = "Plain JSON value." };
+
+            if (LooksLikeBinarySerialized(bytes))
+                return new DecodedValueInfo { Kind = "Binary serialized value", Notes = "Binary data with non-printable byte patterns." };
+
+            double entropy = CalculateEntropy(bytes);
+            if (bytes.Length >= 32 && entropy >= 7.2)
+                return new DecodedValueInfo { Kind = "Unknown high-entropy blob", Notes = $"Entropy {entropy:0.00}; no supported decoder matched." };
+
+            return new DecodedValueInfo { Kind = "Plain text", Preview = TrimDecodedPreview(text), Notes = "Readable value; no additional decoding was required." };
+        }
+
+        private static bool IsChromiumEncryptedBlob(byte[] bytes)
+        {
+            return bytes.Length > 3
+                && bytes[0] == (byte)'v'
+                && bytes[1] >= (byte)'0'
+                && bytes[1] <= (byte)'9'
+                && bytes[2] >= (byte)'0'
+                && bytes[2] <= (byte)'9';
+        }
+
+        private static DecodedValueInfo TryDecryptChromiumBlob(byte[] encryptedBlob, string? profilePath, string? associatedData)
+        {
+            string version = encryptedBlob.Length >= 3 ? Encoding.ASCII.GetString(encryptedBlob, 0, 3) : "unknown";
+
+            if (version.Equals("v20", StringComparison.OrdinalIgnoreCase))
+            {
+                return new DecodedValueInfo
+                {
+                    Kind = "Chromium App-Bound encrypted blob",
+                    Notes = "Chrome/Chromium v20 App-Bound encryption is tied to the local application/user context and is not decrypted offline."
+                };
+            }
+
+            byte[]? key = TryGetChromiumAesKey(profilePath);
+            if (key == null || key.Length == 0)
+            {
+                return new DecodedValueInfo
+                {
+                    Kind = "Chromium encrypted blob",
+                    Notes = "AES-GCM blob detected, but the Local State DPAPI key could not be recovered in the current Windows context."
+                };
+            }
+
+            try
+            {
+                if (encryptedBlob.Length < 3 + 12 + 16)
+                    return new DecodedValueInfo { Kind = "Chromium encrypted blob", Notes = "Blob is too short for Chromium AES-GCM layout." };
+
+                byte[] nonce = encryptedBlob.Skip(3).Take(12).ToArray();
+                byte[] cipherText = encryptedBlob.Skip(15).Take(encryptedBlob.Length - 15 - 16).ToArray();
+                byte[] tag = encryptedBlob.Skip(encryptedBlob.Length - 16).ToArray();
+                byte[] plain = new byte[cipherText.Length];
+
+                using (AesGcm aes = new AesGcm(key, 16))
+                {
+                    aes.Decrypt(nonce, cipherText, tag, plain);
+                }
+
+                string decoded = DecodeBestEffortText(RemoveChromiumCookieHostHashIfPresent(plain, associatedData));
+                return new DecodedValueInfo
+                {
+                    Kind = "Decrypted Chromium value",
+                    Preview = TrimDecodedPreview(decoded),
+                    Notes = $"{version} AES-GCM decrypted with Local State key recovered through DPAPI."
+                };
+            }
+            catch (Exception ex)
+            {
+                return new DecodedValueInfo
+                {
+                    Kind = "Chromium encrypted blob",
+                    Notes = $"AES-GCM decryption failed: {ex.Message}"
+                };
+            }
+        }
+
+        private static byte[] RemoveChromiumCookieHostHashIfPresent(byte[] plain, string? hostKey)
+        {
+            if (plain.Length <= 32 || string.IsNullOrWhiteSpace(hostKey))
+                return plain;
+
+            byte[] hostHash = SHA256.HashData(Encoding.UTF8.GetBytes(hostKey));
+            if (plain.Take(32).SequenceEqual(hostHash))
+                return plain.Skip(32).ToArray();
+
+            return plain;
+        }
+
+        private static byte[]? TryGetChromiumAesKey(string? profilePath)
+        {
+            string? localStatePath = FindChromiumLocalState(profilePath);
+            if (string.IsNullOrWhiteSpace(localStatePath) || !File.Exists(localStatePath))
+                return null;
+
+            try
+            {
+                using JsonDocument document = JsonDocument.Parse(File.ReadAllText(localStatePath));
+                if (!document.RootElement.TryGetProperty("os_crypt", out JsonElement osCrypt) ||
+                    !osCrypt.TryGetProperty("encrypted_key", out JsonElement encryptedKeyElement))
+                    return null;
+
+                string? encryptedKeyBase64 = encryptedKeyElement.GetString();
+                if (string.IsNullOrWhiteSpace(encryptedKeyBase64))
+                    return null;
+
+                byte[] encryptedKey = Convert.FromBase64String(encryptedKeyBase64);
+                if (encryptedKey.Length > 5 && Encoding.ASCII.GetString(encryptedKey, 0, 5) == "DPAPI")
+                    encryptedKey = encryptedKey.Skip(5).ToArray();
+
+                return TryCryptUnprotectData(encryptedKey);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static string? FindChromiumLocalState(string? profilePath)
+        {
+            if (string.IsNullOrWhiteSpace(profilePath))
+                return null;
+
+            DirectoryInfo? directory = new DirectoryInfo(profilePath);
+            for (int i = 0; directory != null && i < 5; i++, directory = directory.Parent)
+            {
+                string candidate = Path.Combine(directory.FullName, "Local State");
+                if (File.Exists(candidate))
+                    return candidate;
+            }
+
+            return null;
+        }
+
+        private static DecodedValueInfo TryDecryptDpapiBlob(byte[] bytes)
+        {
+            byte[]? plain = TryCryptUnprotectData(bytes);
+            if (plain == null)
+            {
+                return new DecodedValueInfo
+                {
+                    Kind = "DPAPI encrypted blob",
+                    Notes = "DPAPI blob detected, but it could not be decrypted in the current Windows user/machine context."
+                };
+            }
+
+            return new DecodedValueInfo
+            {
+                Kind = "Decrypted DPAPI blob",
+                Preview = TrimDecodedPreview(DecodeBestEffortText(plain)),
+                Notes = "DPAPI decryption succeeded in the current Windows context."
+            };
+        }
+
+        private static byte[]? TryCryptUnprotectData(byte[] protectedBytes)
+        {
+            if (protectedBytes == null || protectedBytes.Length == 0)
+                return null;
+
+            DATA_BLOB input = new DATA_BLOB();
+            DATA_BLOB output = new DATA_BLOB();
+            IntPtr inputPtr = IntPtr.Zero;
+
+            try
+            {
+                inputPtr = Marshal.AllocHGlobal(protectedBytes.Length);
+                Marshal.Copy(protectedBytes, 0, inputPtr, protectedBytes.Length);
+                input.pbData = inputPtr;
+                input.cbData = protectedBytes.Length;
+
+                if (!CryptUnprotectData(ref input, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, 0, ref output) || output.pbData == IntPtr.Zero)
+                    return null;
+
+                byte[] result = new byte[output.cbData];
+                Marshal.Copy(output.pbData, result, 0, output.cbData);
+                return result;
+            }
+            catch
+            {
+                return null;
+            }
+            finally
+            {
+                if (inputPtr != IntPtr.Zero)
+                    Marshal.FreeHGlobal(inputPtr);
+                if (output.pbData != IntPtr.Zero)
+                    LocalFree(output.pbData);
+            }
+        }
+
+        private static DecodedValueInfo? TryDecodeCompressed(byte[] bytes)
+        {
+            if (bytes == null || bytes.Length < 4)
+                return null;
+
+            try
+            {
+                byte[]? decompressed = null;
+                if (bytes[0] == 0x1f && bytes[1] == 0x8b)
+                    decompressed = Decompress(bytes, stream => new GZipStream(stream, CompressionMode.Decompress));
+                else if (bytes[0] == 0x78 && (bytes[1] == 0x01 || bytes[1] == 0x5e || bytes[1] == 0x9c || bytes[1] == 0xda))
+                    decompressed = Decompress(bytes, stream => new ZLibStream(stream, CompressionMode.Decompress));
+
+                if (decompressed == null || decompressed.Length == 0)
+                    return null;
+
+                string text = DecodeBestEffortText(decompressed);
+                string kind = LooksLikeJson(text) ? "Compressed JSON" : "Compressed text";
+                return new DecodedValueInfo { Kind = kind, Preview = TrimDecodedPreview(LooksLikeJson(text) ? PrettyJson(text) : text), Notes = "Compressed payload decompressed successfully." };
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static byte[] Decompress(byte[] bytes, Func<Stream, Stream> createStream)
+        {
+            using MemoryStream source = new MemoryStream(bytes);
+            using Stream decompressor = createStream(source);
+            using MemoryStream target = new MemoryStream();
+            decompressor.CopyTo(target);
+            return target.ToArray();
+        }
+
+        private static DecodedValueInfo? TryDecodeJwt(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+                return null;
+
+            string[] parts = text.Trim().Split('.');
+            if (parts.Length != 3)
+                return null;
+
+            try
+            {
+                string header = DecodeBestEffortText(Base64UrlDecode(parts[0]));
+                string payload = DecodeBestEffortText(Base64UrlDecode(parts[1]));
+                if (!LooksLikeJson(header) || !LooksLikeJson(payload))
+                    return null;
+
+                JObject decoded = new JObject
+                {
+                    ["header"] = JToken.Parse(header),
+                    ["payload"] = JToken.Parse(payload),
+                    ["signature"] = "[not verified]"
+                };
+
+                return new DecodedValueInfo { Kind = "JWT-like token", Preview = TrimDecodedPreview(decoded.ToString(Formatting.Indented)), Notes = "Header and payload decoded; signature was not verified." };
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static DecodedValueInfo? TryDecodeUrlEncoded(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text) || (!text.Contains('%') && !text.Contains('+')))
+                return null;
+
+            try
+            {
+                string decoded = Uri.UnescapeDataString(text.Replace("+", " "));
+                if (string.Equals(decoded, text, StringComparison.Ordinal))
+                    return null;
+
+                return new DecodedValueInfo
+                {
+                    Kind = LooksLikeJson(decoded) ? "URL encoded JSON" : "URL encoded text",
+                    Preview = TrimDecodedPreview(LooksLikeJson(decoded) ? PrettyJson(decoded) : decoded),
+                    Notes = "URL percent-encoding decoded."
+                };
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static DecodedValueInfo? TryDecodeBase64(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+                return null;
+
+            string candidate = text.Trim();
+            if (candidate.Length < 8 || candidate.Length > 1024 * 1024 || !Regex.IsMatch(candidate, @"^[A-Za-z0-9+/_=-]+$"))
+                return null;
+
+            try
+            {
+                byte[] bytes = candidate.Contains('-') || candidate.Contains('_')
+                    ? Base64UrlDecode(candidate)
+                    : Convert.FromBase64String(PadBase64(candidate));
+
+                if (bytes.Length == 0)
+                    return null;
+
+                DecodedValueInfo? compressed = TryDecodeCompressed(bytes);
+                if (compressed != null)
+                    return compressed;
+
+                string decoded = DecodeBestEffortText(bytes);
+                if (LooksLikeJson(decoded))
+                    return new DecodedValueInfo { Kind = "Base64 encoded JSON", Preview = TrimDecodedPreview(PrettyJson(decoded)), Notes = "Base64 decoded and parsed as JSON." };
+
+                if (LooksLikeTrustedText(bytes))
+                    return new DecodedValueInfo { Kind = "Base64 encoded text", Preview = TrimDecodedPreview(decoded), Notes = "Base64 decoded to readable text." };
+
+                return new DecodedValueInfo { Kind = "Base64 encoded binary", Notes = "Base64 decoded, but payload is not readable text." };
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static DecodedValueInfo? TryDecodeHex(string text)
+        {
+            string candidate = (text ?? "").Trim();
+            if (candidate.Length < 8 || candidate.Length % 2 != 0 || !Regex.IsMatch(candidate, @"\A[0-9a-fA-F]+\z"))
+                return null;
+
+            try
+            {
+                byte[] bytes = Convert.FromHexString(candidate);
+                string decoded = DecodeBestEffortText(bytes);
+                if (!LooksLikeTrustedText(bytes) && !LooksLikeJson(decoded))
+                    return null;
+
+                return new DecodedValueInfo
+                {
+                    Kind = LooksLikeJson(decoded) ? "Hex encoded JSON" : "Hex encoded text",
+                    Preview = TrimDecodedPreview(LooksLikeJson(decoded) ? PrettyJson(decoded) : decoded),
+                    Notes = "Hex string decoded."
+                };
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static byte[] Base64UrlDecode(string input)
+        {
+            string padded = PadBase64(input.Replace('-', '+').Replace('_', '/'));
+            return Convert.FromBase64String(padded);
+        }
+
+        private static string PadBase64(string input)
+        {
+            int remainder = input.Length % 4;
+            return remainder == 0 ? input : input + new string('=', 4 - remainder);
+        }
+
+        private static string DecodeBestEffortText(byte[] bytes)
+        {
+            if (bytes == null || bytes.Length == 0)
+                return string.Empty;
+
+            string text = Encoding.UTF8.GetString(bytes);
+            text = text.Trim('\0', '\uFEFF');
+            return Regex.Replace(text, @"\s+", " ").Trim();
+        }
+
+        private static bool LooksLikeJson(string? text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+                return false;
+
+            string trimmed = text.Trim();
+            if ((!trimmed.StartsWith("{") || !trimmed.EndsWith("}")) && (!trimmed.StartsWith("[") || !trimmed.EndsWith("]")))
+                return false;
+
+            try
+            {
+                JToken.Parse(trimmed);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static string PrettyJson(string text)
+        {
+            try
+            {
+                return JToken.Parse(text).ToString(Formatting.Indented);
+            }
+            catch
+            {
+                return text;
+            }
+        }
+
+        private static bool LooksLikeBinarySerialized(byte[] bytes)
+        {
+            if (bytes == null || bytes.Length == 0)
+                return false;
+
+            int nonPrintable = bytes.Count(b => b < 0x09 || (b > 0x0d && b < 0x20));
+            return bytes.Length >= 16 && nonPrintable > bytes.Length / 4;
+        }
+
+        private static double CalculateEntropy(byte[] bytes)
+        {
+            if (bytes == null || bytes.Length == 0)
+                return 0;
+
+            double entropy = 0;
+            foreach (IGrouping<byte, byte> group in bytes.GroupBy(b => b))
+            {
+                double p = (double)group.Count() / bytes.Length;
+                entropy -= p * Math.Log(p, 2);
+            }
+
+            return entropy;
+        }
+
+        private static string? TrimDecodedPreview(string? value, int maxLength = 2000)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return null;
+
+            string normalized = value.Trim();
+            return normalized.Length <= maxLength ? normalized : normalized.Substring(0, maxLength);
+        }
+
         private static void InsertLocalStorageRow(
             SQLiteConnection connection,
             SQLiteTransaction transaction,
@@ -4035,13 +4654,17 @@ namespace Browser_Reviewer
             if (tableName != "local_storage_data" && tableName != "session_storage_data" && tableName != "indexeddb_data")
                 throw new ArgumentException("Unexpected storage table.", nameof(tableName));
 
+            DecodedValueInfo decoded = InspectDecodedValue(valuePreview);
+
             using SQLiteCommand command = new SQLiteCommand($@"
                 INSERT INTO {tableName}
                 (Artifact_type, Potential_activity, Browser, Origin, Host, Storage_key, Value_preview, Value_size,
-                 Value_sha256, Source_kind, Source_file, Created, Modified, LastAccessed, Parser_notes, File)
+                 Value_sha256, Value_kind, Decoded_value_preview, Decoder_notes, Source_kind, Source_file,
+                 Created, Modified, LastAccessed, Parser_notes, File)
                 VALUES
                 (@Artifact_type, @Potential_activity, @Browser, @Origin, @Host, @Storage_key, @Value_preview, @Value_size,
-                 @Value_sha256, @Source_kind, @Source_file, @Created, @Modified, @LastAccessed, @Parser_notes, @File);", connection, transaction);
+                 @Value_sha256, @Value_kind, @Decoded_value_preview, @Decoder_notes, @Source_kind, @Source_file,
+                 @Created, @Modified, @LastAccessed, @Parser_notes, @File);", connection, transaction);
 
             command.Parameters.AddWithValue("@Artifact_type", BuildArtifactType(browserType, artifactSuffix));
             command.Parameters.AddWithValue("@Potential_activity", potentialActivity);
@@ -4052,6 +4675,9 @@ namespace Browser_Reviewer
             command.Parameters.AddWithValue("@Value_preview", valuePreview ?? (object)DBNull.Value);
             command.Parameters.AddWithValue("@Value_size", valueSize);
             command.Parameters.AddWithValue("@Value_sha256", valueSha256 ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@Value_kind", decoded.Kind ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@Decoded_value_preview", decoded.Preview ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@Decoder_notes", decoded.Notes ?? (object)DBNull.Value);
             command.Parameters.AddWithValue("@Source_kind", sourceKind ?? (object)DBNull.Value);
             command.Parameters.AddWithValue("@Source_file", sourceFile ?? (object)DBNull.Value);
             command.Parameters.AddWithValue("@Created", FormatDateTime(created) ?? (object)DBNull.Value);
@@ -4131,6 +4757,9 @@ namespace Browser_Reviewer
                 string? federationUrl = GetNullableString(reader, "federation_url");
                 byte[]? encryptedPassword = GetNullableBytes(reader, "password_value");
                 int passwordPresent = encryptedPassword != null && encryptedPassword.Length > 0 ? 1 : 0;
+                DecodedValueInfo credentialInfo = passwordPresent == 1
+                    ? InspectDecodedValue(null, encryptedPassword, "chromium-password", profilePath)
+                    : new DecodedValueInfo { Kind = "No credential blob", Notes = "No password blob present." };
                 InsertSavedLoginRow(targetConnection, transaction,
                     browserType,
                     passwordPresent == 1 ? "Saved credential present" : "Saved login metadata",
@@ -4150,8 +4779,11 @@ namespace Browser_Reviewer
                     passwordPresent,
                     ComputeSha256Hex(encryptedPassword),
                     encryptedPassword?.Length ?? 0,
-                    "Not attempted",
+                    string.Equals(credentialInfo.Kind, "Decrypted Chromium value", StringComparison.OrdinalIgnoreCase) ? "Decrypted" : "Not decrypted",
                     passwordPresent == 1 ? "Saved encrypted password blob present" : "No password blob present",
+                    credentialInfo.Kind,
+                    credentialInfo.Preview,
+                    credentialInfo.Notes,
                     "Chromium Login Data",
                     GetNullableString(reader, "guid"),
                     loginDbPath);
@@ -4216,6 +4848,9 @@ namespace Browser_Reviewer
                 string? encryptedPassword = GetJsonString(login, "encryptedPassword");
                 int passwordPresent = string.IsNullOrWhiteSpace(encryptedPassword) ? 0 : 1;
                 byte[]? encryptedPasswordBytes = !string.IsNullOrWhiteSpace(encryptedPassword) ? Encoding.UTF8.GetBytes(encryptedPassword) : null;
+                DecodedValueInfo credentialInfo = passwordPresent == 1
+                    ? InspectDecodedValue(encryptedPassword, encryptedPasswordBytes, "firefox-nss-password", profilePath)
+                    : new DecodedValueInfo { Kind = "No credential blob", Notes = "No encrypted password value present." };
                 InsertSavedLoginRow(targetConnection, transaction,
                     browserType,
                     passwordPresent == 1 ? "Saved credential present" : "Saved login metadata",
@@ -4235,8 +4870,11 @@ namespace Browser_Reviewer
                     passwordPresent,
                     ComputeSha256Hex(encryptedPasswordBytes),
                     encryptedPasswordBytes?.Length ?? 0,
-                    "Not attempted",
+                    "Not decrypted",
                     passwordPresent == 1 ? "Saved encrypted password value present" : "No encrypted password value present",
+                    credentialInfo.Kind,
+                    credentialInfo.Preview,
+                    credentialInfo.Notes,
                     "Firefox logins.json",
                     GetJsonString(login, "guid"),
                     loginsPath);
@@ -4284,6 +4922,9 @@ namespace Browser_Reviewer
             int encryptedPasswordSize,
             string decryptionStatus,
             string? credentialArtifactValue,
+            string? credentialKind,
+            string? decodedCredentialPreview,
+            string? credentialDecoderNotes,
             string store,
             string? loginGuid,
             string file)
@@ -4293,12 +4934,12 @@ namespace Browser_Reviewer
                 (Artifact_type, Potential_activity, Browser, Url, Action_url, Signon_realm, Username, Username_field,
                  Password_field, Scheme, Times_used, Created, Last_used, Password_changed, Is_blacklisted, Is_federated,
                  Password_present, Encrypted_password_sha256, Encrypted_password_size, Decryption_status, Credential_artifact_value,
-                 Store, Login_guid, File)
+                 Credential_kind, Decoded_credential_preview, Credential_decoder_notes, Store, Login_guid, File)
                 VALUES
                 (@Artifact_type, @Potential_activity, @Browser, @Url, @Action_url, @Signon_realm, @Username, @Username_field,
                  @Password_field, @Scheme, @Times_used, @Created, @Last_used, @Password_changed, @Is_blacklisted, @Is_federated,
                  @Password_present, @Encrypted_password_sha256, @Encrypted_password_size, @Decryption_status, @Credential_artifact_value,
-                 @Store, @Login_guid, @File);", connection, transaction);
+                 @Credential_kind, @Decoded_credential_preview, @Credential_decoder_notes, @Store, @Login_guid, @File);", connection, transaction);
 
             command.Parameters.AddWithValue("@Artifact_type", BuildArtifactType(browserType, "saved logins"));
             command.Parameters.AddWithValue("@Potential_activity", potentialActivity);
@@ -4321,6 +4962,9 @@ namespace Browser_Reviewer
             command.Parameters.AddWithValue("@Encrypted_password_size", encryptedPasswordSize);
             command.Parameters.AddWithValue("@Decryption_status", decryptionStatus ?? (object)DBNull.Value);
             command.Parameters.AddWithValue("@Credential_artifact_value", credentialArtifactValue ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@Credential_kind", credentialKind ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@Decoded_credential_preview", decodedCredentialPreview ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@Credential_decoder_notes", credentialDecoderNotes ?? (object)DBNull.Value);
             command.Parameters.AddWithValue("@Store", store);
             command.Parameters.AddWithValue("@Login_guid", loginGuid ?? (object)DBNull.Value);
             command.Parameters.AddWithValue("@File", file);
@@ -6062,6 +6706,10 @@ namespace Browser_Reviewer
                                 string? value = GetNullableString(readerCookies, "value");
                                 byte[]? encryptedValue = readerCookies["encrypted_value"] as byte[];
                                 bool isEncrypted = encryptedValue != null && encryptedValue.Length > 0;
+                                string? hostKey = GetNullableString(readerCookies, "host_key");
+                                DecodedValueInfo valueInfo = isEncrypted
+                                    ? InspectDecodedValue(value, encryptedValue, "chromium-cookie", profilePath, hostKey)
+                                    : InspectDecodedValue(value);
                                 object storedValue = string.IsNullOrEmpty(value) && isEncrypted
                                     ? "[encrypted]"
                                     : value ?? (object)DBNull.Value;
@@ -6069,18 +6717,18 @@ namespace Browser_Reviewer
                                 string insertCookie = @"INSERT INTO cookies_data
                                     (Artifact_type, Potential_activity, Browser, Host, Name, Value, Path, Created, Expires, LastAccessed,
                                      IsSecure, IsHttpOnly, IsPersistent, SameSite, SourceScheme, SourcePort,
-                                     IsEncrypted, File)
+                                     IsEncrypted, ValueKind, DecodedValuePreview, DecoderNotes, File)
                                     VALUES
                                     (@Artifact_type, @Potential_activity, @Browser, @Host, @Name, @Value, @Path, @Created, @Expires, @LastAccessed,
                                      @IsSecure, @IsHttpOnly, @IsPersistent, @SameSite, @SourceScheme, @SourcePort,
-                                     @IsEncrypted, @File)";
+                                     @IsEncrypted, @ValueKind, @DecodedValuePreview, @DecoderNotes, @File)";
 
                                 using (SQLiteCommand insertCommand = new SQLiteCommand(insertCookie, targetConnection, transaction))
                                 {
                                     insertCommand.Parameters.AddWithValue("@Artifact_type", BuildArtifactType(resolvedBrowserType, "cookies"));
                                     insertCommand.Parameters.AddWithValue("@Potential_activity", "Web cookie stored");
                                     insertCommand.Parameters.AddWithValue("@Browser", resolvedBrowserType);
-                                    insertCommand.Parameters.AddWithValue("@Host", GetNullableString(readerCookies, "host_key") ?? (object)DBNull.Value);
+                                    insertCommand.Parameters.AddWithValue("@Host", hostKey ?? (object)DBNull.Value);
                                     insertCommand.Parameters.AddWithValue("@Name", GetNullableString(readerCookies, "name") ?? (object)DBNull.Value);
                                     insertCommand.Parameters.AddWithValue("@Value", storedValue);
                                     insertCommand.Parameters.AddWithValue("@Path", GetNullableString(readerCookies, "path") ?? (object)DBNull.Value);
@@ -6094,6 +6742,9 @@ namespace Browser_Reviewer
                                     insertCommand.Parameters.AddWithValue("@SourceScheme", GetNullableString(readerCookies, "source_scheme") ?? (object)DBNull.Value);
                                     insertCommand.Parameters.AddWithValue("@SourcePort", readerCookies.IsDBNull(readerCookies.GetOrdinal("source_port")) ? (object)DBNull.Value : GetNullableInt32(readerCookies, "source_port"));
                                     insertCommand.Parameters.AddWithValue("@IsEncrypted", isEncrypted ? 1 : 0);
+                                    insertCommand.Parameters.AddWithValue("@ValueKind", valueInfo.Kind ?? (object)DBNull.Value);
+                                    insertCommand.Parameters.AddWithValue("@DecodedValuePreview", valueInfo.Preview ?? (object)DBNull.Value);
+                                    insertCommand.Parameters.AddWithValue("@DecoderNotes", valueInfo.Notes ?? (object)DBNull.Value);
                                     insertCommand.Parameters.AddWithValue("@File", cookiesDbPath);
                                     insertCommand.ExecuteNonQuery();
                                 }
@@ -6183,12 +6834,14 @@ namespace Browser_Reviewer
                         {
                             while (readerCookies.Read())
                             {
+                                string? cookieValue = GetNullableString(readerCookies, "value");
+                                DecodedValueInfo valueInfo = InspectDecodedValue(cookieValue);
                                 string insertCookie = @"INSERT INTO cookies_data
                                     (Artifact_type, Potential_activity, Browser, Host, Name, Value, Path, Created, Expires, LastAccessed,
-                                     IsSecure, IsHttpOnly, IsPersistent, SameSite, IsEncrypted, File)
+                                     IsSecure, IsHttpOnly, IsPersistent, SameSite, IsEncrypted, ValueKind, DecodedValuePreview, DecoderNotes, File)
                                     VALUES
                                     (@Artifact_type, @Potential_activity, @Browser, @Host, @Name, @Value, @Path, @Created, @Expires, @LastAccessed,
-                                     @IsSecure, @IsHttpOnly, @IsPersistent, @SameSite, @IsEncrypted, @File)";
+                                     @IsSecure, @IsHttpOnly, @IsPersistent, @SameSite, @IsEncrypted, @ValueKind, @DecodedValuePreview, @DecoderNotes, @File)";
 
                                 using (SQLiteCommand insertCommand = new SQLiteCommand(insertCookie, targetConnection, transaction))
                                 {
@@ -6197,7 +6850,7 @@ namespace Browser_Reviewer
                                     insertCommand.Parameters.AddWithValue("@Browser", browserType);
                                     insertCommand.Parameters.AddWithValue("@Host", GetNullableString(readerCookies, "host") ?? (object)DBNull.Value);
                                     insertCommand.Parameters.AddWithValue("@Name", GetNullableString(readerCookies, "name") ?? (object)DBNull.Value);
-                                    insertCommand.Parameters.AddWithValue("@Value", GetNullableString(readerCookies, "value") ?? (object)DBNull.Value);
+                                    insertCommand.Parameters.AddWithValue("@Value", cookieValue ?? (object)DBNull.Value);
                                     insertCommand.Parameters.AddWithValue("@Path", GetNullableString(readerCookies, "path") ?? (object)DBNull.Value);
                                     insertCommand.Parameters.AddWithValue("@Created", FormatDateTime(UnixMicrosecondsToDateTime(GetNullableInt64(readerCookies, "creationTime"))) ?? (object)DBNull.Value);
                                     insertCommand.Parameters.AddWithValue("@Expires", FormatDateTime(UnixSecondsToDateTime(GetNullableInt64(readerCookies, "expiry"))) ?? (object)DBNull.Value);
@@ -6207,6 +6860,9 @@ namespace Browser_Reviewer
                                     insertCommand.Parameters.AddWithValue("@IsPersistent", GetNullableInt32(readerCookies, "isSession") == 0 ? 1 : 0);
                                     insertCommand.Parameters.AddWithValue("@SameSite", GetNullableString(readerCookies, "sameSite") ?? (object)DBNull.Value);
                                     insertCommand.Parameters.AddWithValue("@IsEncrypted", 0);
+                                    insertCommand.Parameters.AddWithValue("@ValueKind", valueInfo.Kind ?? (object)DBNull.Value);
+                                    insertCommand.Parameters.AddWithValue("@DecodedValuePreview", valueInfo.Preview ?? (object)DBNull.Value);
+                                    insertCommand.Parameters.AddWithValue("@DecoderNotes", valueInfo.Notes ?? (object)DBNull.Value);
                                     insertCommand.Parameters.AddWithValue("@File", sourceFilePath);
                                     insertCommand.ExecuteNonQuery();
                                 }
@@ -7277,6 +7933,10 @@ namespace Browser_Reviewer
             if (!ShouldStoreCacheBody(fileInfo, detected))
             {
                 result.BodyPreview = BuildBodyPreview(sample, detected);
+                DecodedValueInfo sampleInfo = InspectDecodedValue(result.BodyPreview, sample);
+                result.BodyKind = sampleInfo.Kind;
+                result.DecodedBodyPreview = sampleInfo.Preview;
+                result.BodyDecoderNotes = sampleInfo.Notes;
                 return result;
             }
 
@@ -7284,6 +7944,10 @@ namespace Browser_Reviewer
             result.Body = body;
             result.BodyStored = 1;
             result.BodyPreview = BuildBodyPreview(body, detected);
+            DecodedValueInfo bodyInfo = InspectDecodedValue(result.BodyPreview, body);
+            result.BodyKind = bodyInfo.Kind;
+            result.DecodedBodyPreview = bodyInfo.Preview;
+            result.BodyDecoderNotes = bodyInfo.Notes;
 
             return result;
         }
@@ -7314,12 +7978,20 @@ namespace Browser_Reviewer
             if (safeBody.Length <= 0 || safeBody.Length > 25 * 1024 * 1024 || !detected.IsForensicallyValuable)
             {
                 result.BodyPreview = BuildBodyPreview(sample, detected);
+                DecodedValueInfo sampleInfo = InspectDecodedValue(result.BodyPreview, sample);
+                result.BodyKind = sampleInfo.Kind;
+                result.DecodedBodyPreview = sampleInfo.Preview;
+                result.BodyDecoderNotes = sampleInfo.Notes;
                 return result;
             }
 
             result.Body = safeBody;
             result.BodyStored = 1;
             result.BodyPreview = BuildBodyPreview(safeBody, detected);
+            DecodedValueInfo bodyInfo = InspectDecodedValue(result.BodyPreview, safeBody);
+            result.BodyKind = bodyInfo.Kind;
+            result.DecodedBodyPreview = bodyInfo.Preview;
+            result.BodyDecoderNotes = bodyInfo.Notes;
             return result;
         }
 
@@ -7497,11 +8169,11 @@ namespace Browser_Reviewer
             string insertCache = @"INSERT INTO cache_data
                 (Artifact_type, Potential_activity, Browser, Url, Host, ContentType, CacheType, HttpStatus, Server, FileSize,
                  Created, Modified, LastAccessed, CacheFile, CacheKey, Body, BodySize, BodySha256,
-                 BodyStored, BodyPreview, DetectedFileType, DetectedExtension, File)
+                 BodyStored, BodyPreview, BodyKind, DecodedBodyPreview, BodyDecoderNotes, DetectedFileType, DetectedExtension, File)
                 VALUES
                 (@Artifact_type, @Potential_activity, @Browser, @Url, @Host, @ContentType, @CacheType, @HttpStatus, @Server, @FileSize,
                  @Created, @Modified, @LastAccessed, @CacheFile, @CacheKey, @Body, @BodySize, @BodySha256,
-                 @BodyStored, @BodyPreview, @DetectedFileType, @DetectedExtension, @File)";
+                 @BodyStored, @BodyPreview, @BodyKind, @DecodedBodyPreview, @BodyDecoderNotes, @DetectedFileType, @DetectedExtension, @File)";
 
             using (SQLiteCommand insertCommand = new SQLiteCommand(insertCache, connection, transaction))
             {
@@ -7525,6 +8197,9 @@ namespace Browser_Reviewer
                 insertCommand.Parameters.AddWithValue("@BodySha256", bodyData.BodySha256 ?? (object)DBNull.Value);
                 insertCommand.Parameters.AddWithValue("@BodyStored", bodyData.BodyStored);
                 insertCommand.Parameters.AddWithValue("@BodyPreview", bodyData.BodyPreview ?? (object)DBNull.Value);
+                insertCommand.Parameters.AddWithValue("@BodyKind", bodyData.BodyKind ?? (object)DBNull.Value);
+                insertCommand.Parameters.AddWithValue("@DecodedBodyPreview", bodyData.DecodedBodyPreview ?? (object)DBNull.Value);
+                insertCommand.Parameters.AddWithValue("@BodyDecoderNotes", bodyData.BodyDecoderNotes ?? (object)DBNull.Value);
                 insertCommand.Parameters.AddWithValue("@DetectedFileType", bodyData.DetectedFileType ?? (object)DBNull.Value);
                 insertCommand.Parameters.AddWithValue("@DetectedExtension", bodyData.DetectedExtension ?? (object)DBNull.Value);
                 insertCommand.Parameters.AddWithValue("@File", cacheFile);
@@ -7633,6 +8308,9 @@ namespace Browser_Reviewer
             public string BodySha256 { get; set; } = string.Empty;
             public int BodyStored { get; set; }
             public string? BodyPreview { get; set; }
+            public string? BodyKind { get; set; }
+            public string? DecodedBodyPreview { get; set; }
+            public string? BodyDecoderNotes { get; set; }
             public string? DetectedFileType { get; set; }
             public string? DetectedExtension { get; set; }
         }

@@ -71,6 +71,16 @@ namespace Browser_Reviewer.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
+        internal static System.Drawing.Bitmap audio_file_32 {
+            get {
+                object obj = ResourceManager.GetObject("audio_file_32", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized resource of type System.Drawing.Icon similar to (Icon).
         /// </summary>
         internal static System.Drawing.Icon AdTrackingAnalytics {
@@ -353,6 +363,16 @@ namespace Browser_Reviewer.Resources {
         /// <summary>
         ///   Looks up a localized resource of type System.Drawing.Bitmap.
         /// </summary>
+        internal static System.Drawing.Bitmap image_file_32 {
+            get {
+                object obj = ResourceManager.GetObject("image_file_32", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
         internal static System.Drawing.Bitmap Internet_32 {
             get {
                 object obj = ResourceManager.GetObject("Internet_32", resourceCulture);
@@ -586,6 +606,16 @@ namespace Browser_Reviewer.Resources {
         internal static System.Drawing.Bitmap visit_icon {
             get {
                 object obj = ResourceManager.GetObject("visit_icon", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
+        internal static System.Drawing.Bitmap video_file_32 {
+            get {
+                object obj = ResourceManager.GetObject("video_file_32", resourceCulture);
                 return ((System.Drawing.Bitmap)(obj));
             }
         }
